@@ -137,6 +137,8 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+.cico{display:inline-flex;width:14px;height:14px}.cico svg{width:14px;height:14px;shape-rendering:crispEdges}
+@media (max-width:600px){#clockVal{display:none}}
 .chip.threat{border-color:var(--bad)}
 .chip.threat .lbl{color:#ff9a9a}
 .chip.threat .pips i.on{background:var(--bad);border-color:var(--bad)}
@@ -278,6 +280,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <div class="chip" id="wChip" title="Weight in your boat's hold"><span class="lbl">Load</span><span id="wVal">0/30 lb</span></div>
     <div class="chip threat" id="threatChip" hidden title="Saltwight hits left"><span class="lbl">Saltwight</span><span class="pips" id="threatVal"></span></div>
     <div class="chip gunchip" id="gunChip" hidden title="Revolver ammo"><img src="" alt="" id="ammoIcon"><span class="cyl" id="cylPips"></span><span id="ammoVal"></span><span class="rbar" aria-label="Reloading"><i id="rbarFill"></i></span></div>
+    <div class="chip" id="clockChip" title="Time of day. Some rare fish only appear at certain times."><span class="cico" id="clockIco"></span><span class="lbl" id="clockName">Morning</span><span id="clockVal">8:00 AM</span></div>
     <div class="chip" id="depthChip" title="Water depth and lure"><span class="lbl" id="depthLbl">Water</span><span id="depthVal">dry</span></div>
   </div>
 
@@ -369,6 +372,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <button class="tab" role="tab" data-tab="bait">Bait and lures</button>
     <button class="tab" role="tab" data-tab="boat">Boats</button>
     <button class="tab" role="tab" data-tab="tackle">Gear</button>
+    <button class="tab" role="tab" data-tab="rest">Rest</button>
   </div>
   <div class="db" id="shopBody"></div>
 </dialog>
@@ -459,19 +463,27 @@ const MAX_DEPTH = {small:230, medium:430, large:450};
 const MINI_TILES = 128; // the mini-map shows this many tiles across, centered on the boat
 
 const SPECIES = [
-  {id:'minnow', name:'Sunny Minnow', rarity:0, dmin:1, dmax:22, speed:6, diff:1, value:4, wmin:.1, wmax:.4, len:10, ht:5, c:['#a9d6cf','#4f8f99','#eef7ef'], acc:'#f2d16b', pattern:'band'},
-  {id:'bluegill', name:'Bluegill', rarity:0, dmin:2, dmax:28, speed:4, diff:2, value:7, wmin:.4, wmax:1.2, len:13, ht:9, c:['#5b8fc4','#2f4f86','#f0a352'], acc:'#3b5e94', pattern:'stripes'},
-  {id:'perch', name:'Yellow Perch', rarity:1, dmin:6, dmax:35, speed:4, diff:3, value:14, wmin:.6, wmax:2, len:15, ht:7, c:['#d9c35a','#6f7d3a','#f3ead0'], acc:'#4c5a2a', pattern:'stripes'},
-  {id:'bass', name:'Largemouth Bass', rarity:1, dmin:8, dmax:45, speed:5, diff:4, value:22, wmin:2, wmax:6, len:20, ht:9, c:['#7fae5a','#3f6634','#e6e4c4'], acc:'#2f4c26', pattern:'band'},
-  {id:'trout', name:'Rainbow Trout', rarity:2, dmin:25, dmax:75, speed:7, diff:5, value:45, wmin:2, wmax:8, len:22, ht:8, c:['#b8c7a8','#5d7a62','#f2ece0'], acc:'#e57a8f', pattern:'band'},
+  {id:'minnow', name:'Sunny Sprat', rarity:0, dmin:1, dmax:22, speed:6, diff:1, value:4, wmin:.1, wmax:.4, len:10, ht:5, c:['#a9d6cf','#4f8f99','#eef7ef'], acc:'#f2d16b', pattern:'band'},
+  {id:'bluegill', name:'Blue Chromis', rarity:0, dmin:2, dmax:28, speed:4, diff:2, value:7, wmin:.4, wmax:1.2, len:13, ht:9, c:['#5b8fc4','#2f4f86','#f0a352'], acc:'#3b5e94', pattern:'stripes'},
+  {id:'perch', name:'Yellowtail Snapper', rarity:1, dmin:6, dmax:35, speed:4, diff:3, value:14, wmin:.6, wmax:2, len:15, ht:7, c:['#d9c35a','#6f7d3a','#f3ead0'], acc:'#4c5a2a', pattern:'stripes'},
+  {id:'bass', name:'Kelp Bass', rarity:1, dmin:8, dmax:45, speed:5, diff:4, value:22, wmin:2, wmax:6, len:20, ht:9, c:['#7fae5a','#3f6634','#e6e4c4'], acc:'#2f4c26', pattern:'band'},
+  {id:'trout', name:'Rainbow Runner', rarity:2, dmin:25, dmax:75, speed:7, diff:5, value:45, wmin:2, wmax:8, len:22, ht:8, c:['#b8c7a8','#5d7a62','#f2ece0'], acc:'#e57a8f', pattern:'band'},
   {id:'eel', name:'Moss Eel', rarity:2, dmin:45, dmax:120, speed:5, diff:6, value:75, wmin:3, wmax:9, len:34, ht:5, c:['#5f7d4a','#33462a','#b9c48a'], acc:'#7f9c5c', pattern:'band', lowFin:true},
-  {id:'pike', name:'Northern Pike', rarity:3, dmin:40, dmax:110, speed:8, diff:7, value:120, wmin:6, wmax:20, len:30, ht:7, c:['#7c9a54','#3e5530','#e3e6c0'], acc:'#d8e4a0', pattern:'spots'},
-  {id:'catfish', name:'Mud Catfish', rarity:2, dmin:90, dmax:170, speed:2, diff:6, value:95, wmin:5, wmax:20, len:26, ht:9, c:['#8b7458','#4e3f30','#d8c9a8'], pattern:'none', whiskers:true, lowFin:true},
-  {id:'koi', name:'Ghost Koi', rarity:3, dmin:100, dmax:190, speed:3, diff:6, value:170, wmin:4, wmax:12, len:20, ht:10, c:['#f4efe6','#d9d2c4','#ffffff'], acc:'#e8503a', pattern:'spots'},
-  {id:'gar', name:'Crystal Gar', rarity:3, dmin:140, dmax:240, speed:7, diff:8, value:260, wmin:8, wmax:22, len:32, ht:6, c:['#9fe3ea','#4b8fa8','#e6fbff'], acc:'#ffffff', pattern:'spots'},
-  {id:'sturgeon', name:'Golden Sturgeon', rarity:4, dmin:170, dmax:280, speed:3, diff:8, value:480, wmin:20, wmax:60, len:36, ht:9, c:['#f0c24a','#a77a1e','#fff1b8'], acc:'#ffe48a', pattern:'stripes'},
+  {id:'pike', name:'Great Barracuda', rarity:3, dmin:40, dmax:110, speed:8, diff:7, value:120, wmin:6, wmax:20, len:30, ht:7, c:['#7c9a54','#3e5530','#e3e6c0'], acc:'#d8e4a0', pattern:'spots'},
+  {id:'catfish', name:'Sea Catfish', rarity:2, dmin:90, dmax:170, speed:2, diff:6, value:95, wmin:5, wmax:20, len:26, ht:9, c:['#8b7458','#4e3f30','#d8c9a8'], pattern:'none', whiskers:true, lowFin:true},
+  {id:'koi', name:'Ghost Wrasse', rarity:3, dmin:100, dmax:190, speed:3, diff:6, value:170, wmin:4, wmax:12, len:20, ht:10, c:['#f4efe6','#d9d2c4','#ffffff'], acc:'#e8503a', pattern:'spots'},
+  {id:'gar', name:'Crystal Needlefish', rarity:3, dmin:140, dmax:240, speed:7, diff:8, value:260, wmin:8, wmax:22, len:32, ht:6, c:['#9fe3ea','#4b8fa8','#e6fbff'], acc:'#ffffff', pattern:'spots'},
+  {id:'sturgeon', name:'Golden Tarpon', rarity:4, dmin:170, dmax:280, speed:3, diff:8, value:480, wmin:20, wmax:60, len:36, ht:9, c:['#f0c24a','#a77a1e','#fff1b8'], acc:'#ffe48a', pattern:'stripes'},
   {id:'gulper', name:'Gulper Eel', rarity:4, dmin:260, dmax:580, speed:4, diff:9, value:700, wmin:6, wmax:18, len:34, ht:7, c:['#2a1f33','#140f1c','#5a3a5e'], acc:'#ff4f6a', pattern:'band', lowFin:true},
   {id:'lantern', name:'Abyssal Lanternfish', rarity:5, dmin:280, dmax:590, speed:5, diff:10, value:1500, wmin:8, wmax:25, len:24, ht:11, c:['#5b3f8f','#2b1d4f','#a98bd8'], acc:'#7ff0e0', pattern:'spots', lantern:true},
+  // Super rare fish that only show up at one time of day (and, for now, in certain waters)
+  {id:'aurora', name:'Aurora Snapper', rarity:5, time:'dawn', zones:[0,1], dmin:4, dmax:45, speed:5, diff:7, value:900, wmin:3, wmax:9, len:19, ht:9, c:['#f6a7b8','#c0587a','#ffe6c8'], acc:'#ffd36e', pattern:'band'},
+  {id:'dorado', name:'Sunburst Dorado', rarity:5, time:'morning', zones:[1,2], dmin:15, dmax:90, speed:8, diff:8, value:1000, wmin:6, wmax:18, len:26, ht:10, c:['#e8d24a','#3f9a6a','#fff3a8'], acc:'#4fc3e8', pattern:'spots'},
+  {id:'glasswing', name:'Glasswing Flyingfish', rarity:5, time:'midday', zones:[0], dmin:1, dmax:22, speed:9, diff:7, value:850, wmin:1, wmax:3, len:16, ht:6, c:['#cfeff8','#6fb6d6','#ffffff'], acc:'#9fe8ff', pattern:'band'},
+  {id:'sailfish', name:'Amber Sailfish', rarity:5, time:'afternoon', zones:[2,3], dmin:40, dmax:170, speed:9, diff:9, value:1300, wmin:20, wmax:60, len:34, ht:10, c:['#e89a3a','#7a3f1e','#ffe0b0'], acc:'#3a6fb0', pattern:'stripes'},
+  {id:'duskfin', name:'Duskfin Grouper', rarity:5, time:'dusk', zones:[1,2], dmin:25, dmax:140, speed:4, diff:8, value:1100, wmin:15, wmax:45, len:26, ht:12, c:['#d9734a','#5a2f6a','#f7c38a'], acc:'#a874d8', pattern:'spots'},
+  {id:'moray', name:'Violet Moray', rarity:5, time:'evening', zones:[2,3], dmin:60, dmax:220, speed:5, diff:9, value:1200, wmin:8, wmax:24, len:36, ht:6, c:['#7a4fb0','#2e1f52','#c8a8f0'], acc:'#ff8ad8', pattern:'spots', lowFin:true},
+  {id:'oarfish', name:'Moonbeam Oarfish', rarity:5, time:'night', zones:[3,4], dmin:150, dmax:590, speed:4, diff:10, value:1800, wmin:30, wmax:90, len:38, ht:7, c:['#d8e2ee','#6a7c96','#ffffff'], acc:'#ff6a6a', pattern:'band', lantern:true},
 ];
 
 const RODS = [
@@ -544,7 +556,7 @@ const dynMaxDepth = () => Math.min(dynBoomDepth(), LAKE_FT - 1);
 function aimDepth(){ return T.hover ? clamp((T.hover.y + camY - SURF)/FT, .5, dynMaxDepth()) : Math.min(10, dynMaxDepth()); }
 
 /* ================== Save ================== */
-function defaults(){ return {coins:25, inv:[], rod:0, bait:0, boat:0, owned:{rod:[0],bait:[0],boat:[0]}, custom:[], caught:{}, sound:true, shake:!REDUCED, world:null, net:-1, dyn:{count:0, fuse:0, radius:0, bag:0}, weapons:defaultWeapons()}; }
+function defaults(){ return {coins:25, inv:[], rod:0, bait:0, boat:0, owned:{rod:[0],bait:[0],boat:[0]}, custom:[], caught:{}, sound:true, shake:!REDUCED, world:null, net:-1, dyn:{count:0, fuse:0, radius:0, bag:0}, weapons:defaultWeapons(), clock:8*60}; }
 function defaultWeapons(){ return {revolver:{lvl:-1, ammo:0, mag:0}, shotgun:{lvl:-1, ammo:0, mag:0}, sniper:{lvl:-1, ammo:0, mag:0}}; }
 function load(){
   try{
@@ -558,6 +570,7 @@ function load(){
     if(typeof d.gun === 'number' && d.gun >= 0 && d.weapons.revolver.lvl < 0) d.weapons.revolver = {lvl:d.gun, ammo:d.ammo|0, mag:d.cyl|0};
     delete d.gun; delete d.ammo; delete d.cyl;
     for(const id of Object.keys(wd)){ const w = d.weapons[id]; w.lvl = clamp(w.lvl|0, -1, 3); w.ammo = Math.max(0, w.ammo|0); w.mag = Math.max(0, w.mag|0); }
+    d.clock = Number.isFinite(d.clock) ? ((d.clock % 1440) + 1440) % 1440 : 8*60;
     d.rod = clamp(d.rod|0, 0, RODS.length-1); d.bait = clamp(d.bait|0, 0, BAITS.length-1); d.boat = clamp(d.boat|0, 0, BOATS.length-1);
     return d;
   }catch(e){ return defaults(); }
@@ -869,7 +882,7 @@ function buildRuntime(def){
   r.iconURL = def.icon || (def.frames && def.frames[0]) || r.sprite.frames[0].toDataURL();
   return r;
 }
-function rebuildRegistry(){ RT = [...SPECIES, ...S.custom].map(buildRuntime); byId = {}; RT.forEach(r => byId[r.id] = r); addSpecialItems(); }
+function rebuildRegistry(){ RT = [...SPECIES, ...S.custom].map(buildRuntime); byId = {}; RT.forEach(r => byId[r.id] = r); addSpecialItems(); for(const it of S.inv){ const sp = byId[it.sid]; if(sp && !sp.custom) it.name = sp.name; } }
 rebuildRegistry();
 const GENERIC_DEF = {len:16, ht:7, c:['#8aa0b0','#4d6070','#d0dbe2'], pattern:'none'};
 const GENERIC_ICON = genSprite(GENERIC_DEF).frames[0].toDataURL();
@@ -969,15 +982,110 @@ function bandFill(g, x, y, w, h, stops, bands){
   }
 }
 
-// Shared sky for the side view
-const [skyC, skyG] = mk(W, SURF+4);
-bandFill(skyG, 0, 0, W, SURF+4, [[0,'#2b3f7e'],[.45,'#7a6fb0'],[.8,'#f2a47a'],[1,'#ffd59a']], 10);
-(function hills(){
+/* ================== Day and night ==================
+   One full day takes 24 real minutes: one game minute per real second.
+   S.clock is the time of day in game minutes (0 to 1439). */
+const DAY_REAL_SEC = 24*60, GAME_MIN_PER_SEC = 1440/DAY_REAL_SEC;
+const PERIODS = [ // in order through the day; each starts at hour h
+  {id:'dawn',      name:'Dawn',      h:5},
+  {id:'morning',   name:'Morning',   h:7},
+  {id:'midday',    name:'Midday',    h:11},
+  {id:'afternoon', name:'Afternoon', h:14},
+  {id:'dusk',      name:'Dusk',      h:17},
+  {id:'evening',   name:'Evening',   h:19},
+  {id:'night',     name:'Night',     h:22},
+];
+const PERIOD_BY_ID = Object.fromEntries(PERIODS.map(p => [p.id, p]));
+const hourNow = () => S.clock/60;
+function periodAt(min){ const h = min/60; let p = PERIODS[PERIODS.length-1]; for(const q of PERIODS) if(h >= q.h) p = q; return p; }
+const periodNow = () => periodAt(S.clock);
+function clockLabel(min){ const m = Math.floor(min) % 1440, h = Math.floor(m/60), mm = m % 60; return `${(h+11)%12+1}:${String(mm).padStart(2,'0')} ${h<12?'AM':'PM'}`; }
+function lerpKeys(keys, h){ // keys: [[hour, [r,g,b]], ...] covering 0 to 24
+  for(let i=1;i<keys.length;i++) if(h <= keys[i][0]){ const [h0,a] = keys[i-1], [h1,b] = keys[i], t = (h-h0)/Math.max(.001,h1-h0); return a.map((v,k) => Math.round(v + (b[k]-v)*t)); }
+  return keys[keys.length-1][1];
+}
+// The whole scene is multiplied by this color: white at midday, deep blue at night
+const LIGHT_KEYS = [[0,[58,70,138]],[4.4,[62,74,142]],[5.4,[176,142,178]],[6.4,[255,196,186]],[8,[252,242,232]],[11,[255,255,255]],[14.5,[255,250,238]],[16.8,[255,214,170]],[18,[240,156,132]],[19.2,[150,118,170]],[20.6,[88,94,160]],[22,[58,70,138]],[24,[58,70,138]]];
+const lightNow = () => lerpKeys(LIGHT_KEYS, hourNow());
+const darkNow = () => { const c = lightNow(); return clamp(1 - (c[0]*.3 + c[1]*.5 + c[2]*.2)/255, 0, 1); };
+const nightK = () => clamp((darkNow() - .15)/.5, 0, 1); // 0 in daylight, 1 deep in the night
+function applyDayTint(){
+  const c = lightNow(); if(c[0] > 252 && c[1] > 252 && c[2] > 252) return;
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = `rgb(${c})`; ctx.fillRect(0,0,W,H); ctx.restore();
+}
+function updateClock(dt){
+  if(!WORLD || anyDialog()) return;
+  const before = periodNow().id;
+  S.clock = (S.clock + dt*GAME_MIN_PER_SEC) % 1440;
+  const p = periodNow();
+  if(p.id !== before) toast(PERIOD_TOAST[p.id]);
+}
+const PERIOD_TOAST = {dawn:'Dawn breaks over the isles.', morning:'Morning. The water is warming up.', midday:'Midday. The sun is high.', afternoon:'Afternoon.', dusk:'Dusk settles in.', evening:'Evening. The light is fading.', night:'Night has fallen. Strange fish rise in the dark.'};
+
+// Side-view skies, one per part of the day, crossfaded as time passes. Colors are picked
+// to look right after the day tint is multiplied over them.
+const SKY_PAL = {
+  night:     {sky:['#26357a','#34488c','#43599c','#5468a6'], hills:['#2e3a6c','#20284e']},
+  dawn:      {sky:['#46559a','#9c80bc','#f4a8b0','#ffd6aa'], hills:['#8a76aa','#5e548a']},
+  morning:   {sky:['#5aa6e2','#8cc6ee','#c6e4f4','#f6eedc'], hills:['#7fa6b6','#5c8496']},
+  midday:    {sky:['#3f9ee2','#6cbaf0','#a8daf6','#e2f4fa'], hills:['#78aaa2','#4f8a82']},
+  afternoon: {sky:['#4a98d6','#7cb6e2','#c2dae8','#f8e4c2'], hills:['#86a2aa','#64828e']},
+  dusk:      {sky:['#2b3f7e','#7a6fb0','#f2a47a','#ffd59a'], hills:['#8f7cb4','#5c5690']},
+  evening:   {sky:['#25346e','#4c4c90','#90649c','#c8808e'], hills:['#4c447a','#302e5c']},
+};
+const SKY_KEYS = [[0,'night'],[4.4,'night'],[5.8,'dawn'],[8,'morning'],[12,'midday'],[15.5,'afternoon'],[18,'dusk'],[19.7,'evening'],[21.5,'night'],[24,'night']];
+const SKIES = {};
+for(const [id, pal] of Object.entries(SKY_PAL)){
+  const [c, g] = mk(W, SURF+4);
+  bandFill(g, 0, 0, W, SURF+4, [[0,pal.sky[0]],[.45,pal.sky[1]],[.8,pal.sky[2]],[1,pal.sky[3]]], 10);
+  const [hc, hg] = mk(W, SURF+4);
   let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647; return seed/2147483647;};
-  const layer=(base,amp,col,freq)=>{ skyG.fillStyle=col; for(let x=0;x<W;x++){ const h = Math.sin(x*freq)*amp*.6 + Math.sin(x*freq*2.7+1.3)*amp*.3 + rnd()*1.2; const top=Math.round(base-Math.max(0,h+amp*.4)); skyG.fillRect(x,top,1,SURF+4-top); } };
-  layer(SURF-8, 12, '#8f7cb4', .027);
-  layer(SURF-2, 7, '#5c5690', .045);
-})();
+  const layer=(base,amp,col,freq)=>{ hg.fillStyle=col; for(let x=0;x<W;x++){ const h = Math.sin(x*freq)*amp*.6 + Math.sin(x*freq*2.7+1.3)*amp*.3 + rnd()*1.2; const top=Math.round(base-Math.max(0,h+amp*.4)); hg.fillRect(x,top,1,SURF+4-top); } };
+  layer(SURF-8, 12, pal.hills[0], .027);
+  layer(SURF-2, 7, pal.hills[1], .045);
+  SKIES[id] = {sky:c, hills:hc};
+}
+function skyBlend(){ const h = hourNow(); for(let i=1;i<SKY_KEYS.length;i++) if(h <= SKY_KEYS[i][0]){ const [h0,a] = SKY_KEYS[i-1], [h1,b] = SKY_KEYS[i]; return [a, b, (h-h0)/Math.max(.001,h1-h0)]; } return ['night','night',0]; }
+const STARS = Array.from({length:70}, (_,i) => ({x:(i*97.13 + Math.sin(i*12.9)*40 + 400) % W, y:2 + ((i*53.7) % 34), ph:i*1.7, big:i%11===0}));
+// Sun from 6:00 to 18:30 and moon from 19:00 to 6:30, each on an arc across the sky
+function sunPos(){ const u = (hourNow()-6)/12.5; if(u < -.04 || u > 1.04) return null; return {x:18 + u*284, y:SURF - 4 - Math.sin(Math.PI*clamp(u,0,1))*44, u}; }
+function moonPos(){ const u = (((hourNow()-19)+24)%24)/11.5; if(u > 1.04) return null; return {x:20 + u*280, y:SURF - 8 - Math.sin(Math.PI*clamp(u,0,1))*40, u}; }
+function drawSky(){
+  const [a, b, t] = skyBlend();
+  ctx.drawImage(SKIES[a].sky, 0, 0);
+  if(b !== a && t > 0){ ctx.globalAlpha = t; ctx.drawImage(SKIES[b].sky, 0, 0); ctx.globalAlpha = 1; }
+  const sun = sunPos();
+  if(sun){
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const g = ctx.createRadialGradient(sun.x,sun.y,3,sun.x,sun.y,50); g.addColorStop(0,'rgba(255,225,160,.55)'); g.addColorStop(1,'rgba(255,170,120,0)'); ctx.fillStyle=g; ctx.fillRect(sun.x-50,sun.y-50,100,Math.max(0,Math.min(100, SURF+4-(sun.y-50)))); ctx.restore();
+    const sx = Math.round(sun.x), sy = Math.round(sun.y);
+    for(let y=-8;y<=8;y++){ const w=Math.round(Math.sqrt(64-y*y)); px(sx-w, sy+y, w*2, 1, y>3 ? '#ffe2a8' : '#fff4d2'); }
+  }
+  ctx.drawImage(SKIES[a].hills, 0, 0);
+  if(b !== a && t > 0){ ctx.globalAlpha = t; ctx.drawImage(SKIES[b].hills, 0, 0); ctx.globalAlpha = 1; }
+}
+// Drawn after the tint so they shine through the dark
+function drawNightSky(){
+  const n = nightK(); if(n <= 0) return;
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(const s of STARS){ const a = n*(.45 + .4*Math.sin(time*1.3 + s.ph)); if(a <= .05) continue; ctx.fillStyle = `rgba(235,240,255,${a})`; ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1); if(s.big && a > .5){ ctx.fillStyle = `rgba(235,240,255,${a*.4})`; ctx.fillRect(Math.round(s.x)-1, Math.round(s.y), 3, 1); ctx.fillRect(Math.round(s.x), Math.round(s.y)-1, 1, 3); } }
+  const m = moonPos();
+  if(m && m.y < SURF - 14){
+    const mx = Math.round(m.x), my = Math.round(m.y);
+    const g = ctx.createRadialGradient(mx,my,2,mx,my,26); g.addColorStop(0,`rgba(200,215,255,${.35*n})`); g.addColorStop(1,'rgba(200,215,255,0)'); ctx.fillStyle=g; ctx.fillRect(mx-26,my-26,52,52);
+    for(let y=-5;y<=5;y++){ const w=Math.round(Math.sqrt(25-y*y)); ctx.fillStyle = `rgba(240,240,225,${.9*n})`; ctx.fillRect(mx-w, my+y, w*2, 1); }
+    ctx.fillStyle = `rgba(150,160,190,${.5*n})`; ctx.fillRect(mx-2, my-2, 2, 2); ctx.fillRect(mx+1, my+1, 2, 1);
+  }
+  ctx.restore();
+}
+// A warm glow around a lantern, drawn after the tint; brightest at night
+function lanternGlow(x, y, r, k){
+  if(k <= .02) return;
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const g = ctx.createRadialGradient(x,y,1,x,y,r); g.addColorStop(0,`rgba(255,210,130,${.5*k})`); g.addColorStop(.35,`rgba(255,170,90,${.18*k})`); g.addColorStop(1,'rgba(255,150,80,0)');
+  ctx.fillStyle = g; ctx.fillRect(x-r, y-r, r*2, r*2); ctx.restore();
+}
 const [vigC, vigG] = mk(W, H);
 (function(){ const g=vigG.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.95); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,10,.42)'); vigG.fillStyle=g; vigG.fillRect(0,0,W,H); })();
 function cloudSprite(w,h,seed){
@@ -985,7 +1093,7 @@ function cloudSprite(w,h,seed){
   const r=()=>{s=(s*9301+49297)%233280; return s/233280;};
   for(let i=0;i<5;i++) blobs.push([w*(.15+.7*r()), h*(.45+.3*r()), h*(.3+.25*r())]);
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){ let inside=false; for(const [bx,by,br] of blobs){ const dx=(x-bx)/(br*1.6), dy=(y-by)/br; if(dx*dx+dy*dy<=1) inside=true; } if(y>h*.78) inside=inside && (x>w*.08 && x<w*.92);
-    if(inside){ g.fillStyle = y>h*.62 ? '#e9b4ac' : y<h*.3 ? '#fff4e6' : '#ffe3cf'; g.fillRect(x,y,1,1);} }
+    if(inside){ g.fillStyle = y>h*.62 ? '#d6dce8' : y<h*.3 ? '#ffffff' : '#eef1f6'; g.fillRect(x,y,1,1);} }
   return c;
 }
 const clouds = [[20,8,44,12,3],[120,18,32,9,11],[200,6,52,14,21],[290,20,30,9,5]].map(([x,y,w,h,s])=>({x,y,img:cloudSprite(w,h,s),v:rand(2,4)}));
@@ -1063,8 +1171,10 @@ function pickSpecies(pool){
   for(let i=0;i<pool.length;i++){ r -= ws[i]; if(r<=0) return pool[i]; }
   return pool[0];
 }
+// Time-of-day fish only appear in their window, and only in the waters they live in
+const fitsNow = sp => (!sp.time || sp.time === periodNow().id) && (!sp.zones || sp.zones.includes(ZONE));
 function pickForDepth(d){
-  const fit = RT.filter(sp => sp.dmin < LAKE_FT-1);
+  const fit = RT.filter(sp => sp.dmin < LAKE_FT-1 && fitsNow(sp));
   const pool = fit.filter(sp => sp.dmin-4 <= d && sp.dmax+4 >= d);
   return pickSpecies(pool.length ? pool : (fit.length ? fit : RT.slice(0,1)));
 }
@@ -1368,6 +1478,18 @@ function renderTravel(zoom){
   // Wake under the boat
   for(const p of T.wake){ const a = p.life/p.max; ctx.fillStyle = p.spray ? `rgba(255,255,255,${a})` : `rgba(225,248,250,${a*.75})`; ctx.fillRect(Math.round(p.x), Math.round(p.y), a>.6 && !p.spray ? 2 : 1, 1); }
   drawTopBoat();
+  // Time of day: tint the map, then let the lighthouse and the boat's lantern shine
+  applyDayTint();
+  const n = nightK();
+  if(n > 0){
+    const h = w.harbor, lx = Math.round(h.wx-4)+.5, ly = Math.round(h.wy-7)+.5;
+    lanternGlow(lx, ly, 26, n);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = n; ctx.translate(lx, ly); ctx.rotate(time*1.1);
+    const g = ctx.createLinearGradient(0,0,90,0); g.addColorStop(0,'rgba(255,236,170,.5)'); g.addColorStop(1,'rgba(255,236,170,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(90,-14); ctx.lineTo(90,14); ctx.closePath(); ctx.fill(); ctx.restore();
+    lanternGlow(T.x, T.y, 20, n*.9);
+    ctx.fillStyle = `rgba(255,226,150,${n})`; ctx.fillRect(Math.round(T.x - Math.cos(T.ang)*3), Math.round(T.y - Math.sin(T.ang)*3), 1, 1);
+  }
   ctx.setTransform(1,0,0,1,0,0);
   ctx.drawImage(vigC, 0, 0);
 }
@@ -2077,8 +2199,16 @@ function drawGunOverlay(fade){
   let col = 0, best = 1e9; GUN_ANGLES.forEach((a, i) => { const d = Math.abs(a - g.aim); if(d < best){ best = d; col = i; } });
   const sx = Math.round((h.x + (G.shakeX||0))*GUN_K), sy = Math.round((h.y - Math.round(camY) + (G.shakeY||0))*GUN_K);
   fxx.globalAlpha = 1 - fade;
-  fxx.drawImage(art.sheet, col*C, (id==='shotgun' || id==='sniper' ? Math.min(row, art.frames-1) : row)*C, C, C, sx - C/2, sy - C/2, C, C);
+  const drawIt = () => fxx.drawImage(art.sheet, col*C, (id==='shotgun' || id==='sniper' ? Math.min(row, art.frames-1) : row)*C, C, C, sx - C/2, sy - C/2, C, C);
+  drawIt();
   fxx.globalAlpha = 1;
+  // Same time-of-day tint as the scene: multiply the gun's square, then trim back to the gun's own pixels
+  const lc = lightNow();
+  if(lc[0] < 253 || lc[1] < 253 || lc[2] < 253){
+    fxx.globalCompositeOperation = 'multiply'; fxx.fillStyle = `rgb(${lc})`; fxx.fillRect(sx - C/2, sy - C/2, C, C);
+    fxx.globalCompositeOperation = 'destination-in'; fxx.globalAlpha = 1 - fade; drawIt();
+    fxx.globalCompositeOperation = 'source-over'; fxx.globalAlpha = 1;
+  }
 }
 const gunChip = $('gunChip');
 let gunChipKey = '';
@@ -2422,6 +2552,10 @@ function drawBoatAndFisher(){
     px(left+11, top-46, 2, 34, '#5a4030');
     for(let i=0;i<5;i++) px(left+13+i*2, top-46 + Math.round(Math.sin(time*5 - i*.8)*1), 2, 5, i%2 ? '#ff6a3d' : '#ff8a5d');
   }
+  // Stern lantern on a short pole; it glows after dark
+  px(left+2, top-11, 1, 11, '#4a3420'); px(left, top-11, 3, 1, '#4a3420');
+  px(left-1, top-10, 3, 3, '#7a5a2a'); px(left, top-9, 1, 1, '#ffd27a');
+  r.lantern = {x:left, y:top-9};
   if(S.boat===1){ px(left-5, top-4, 5, 7, '#2b2f3a'); px(left-6, top-6, 7, 3, '#d84f3a'); px(left-3, top+3, 1, 6, '#55606a'); }
   S.inv.forEach((it, i) => { if(G.pending.has(it.uid)) return; const p = pileSlot(i, r), sp = byId[it.sid]; drawSprite(sp ? sp.pile : GENERIC_PILE, p.x, p.y, hash(it.uid)%2 ? 1 : -1, 0, 0); });
   if(G.state==='landed' && G.landed){ const p = G.landed.slot; drawSprite(G.landed.sp.pile, p.x, p.y + (Math.floor(time*6)%2 ? -1 : 0), 1, time*6, 0); }
@@ -2483,12 +2617,8 @@ function renderFishing(){
   const cy = Math.round(camY);
   ctx.setTransform(1,0,0,1,sx,sy-cy);
   if(cy < SURF+4){
-    ctx.drawImage(skyC, 0, 0);
+    drawSky();
     for(const c of clouds) ctx.drawImage(c.img, Math.round(c.x), c.y);
-    const sunX=250, sunY=30;
-    ctx.save(); ctx.globalCompositeOperation='lighter';
-    const g = ctx.createRadialGradient(sunX,sunY,3,sunX,sunY,50); g.addColorStop(0,'rgba(255,225,160,.55)'); g.addColorStop(1,'rgba(255,170,120,0)'); ctx.fillStyle=g; ctx.fillRect(sunX-50,sunY-50,100,Math.min(100, SURF+4-(sunY-50))); ctx.restore();
-    for(let y=-8;y<=8;y++){ const w=Math.round(Math.sqrt(64-y*y)); px(sunX-w, sunY+y, w*2, 1, y>3 ? '#ffe2a8' : '#fff4d2'); }
   }
   const viewBot = cy + H + 2;
   for(let x=0; x<W; x++){
@@ -2497,11 +2627,12 @@ function renderFishing(){
   }
   if(cy < SURF+4){
     for(let x=0; x<W; x++){ const s=Math.round(surfY(x)); px(x, s, 1, 1, '#c6f0ee'); if((x+Math.floor(time*8))%9<3) px(x, s+1, 1, 1, 'rgba(198,240,238,.35)'); }
-    for(let i=0;i<10;i++){ const yy=SURF+3+i*1.6, ww=Math.max(2, 10-i)*(.6+.4*Math.sin(time*3+i*1.7)); if(Math.sin(time*6+i*2.3)>-.2) px(250-ww/2+Math.sin(time*2+i)*3, yy, ww, 1, 'rgba(255,236,190,.6)'); }
+    const sun = sunPos(); if(sun) for(let i=0;i<10;i++){ const yy=SURF+3+i*1.6, ww=Math.max(2, 10-i)*(.6+.4*Math.sin(time*3+i*1.7)); if(Math.sin(time*6+i*2.3)>-.2) px(sun.x-ww/2+Math.sin(time*2+i)*3, yy, ww, 1, 'rgba(255,236,190,.6)'); }
   }
   if(rockC) ctx.drawImage(rockC, 0, Math.round(cy*.35));
-  if(cy < SURF+160){
-    ctx.save(); ctx.globalCompositeOperation='lighter';
+  const dayK = 1 - nightK();
+  if(cy < SURF+160 && dayK > .05){
+    ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha = dayK;
     for(let i=0;i<4;i++){
       const x0 = 40 + i*78 + Math.sin(time*.4+i)*10, wd = 10 + (i%2)*8, rl = Math.min(120, LAKE_FT*FT);
       const lg = ctx.createLinearGradient(0,SURF,0,SURF+rl); lg.addColorStop(0,'rgba(180,240,255,.11)'); lg.addColorStop(1,'rgba(180,240,255,0)');
@@ -2524,23 +2655,28 @@ function renderFishing(){
   for(const p of parts) if(p.t==='bub' && onScreen(p.y,2)){ ctx.fillStyle='rgba(210,245,250,.7)'; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
   if(bedVisible) for(const k of kelpFront) drawKelp(k, false);
   ctx.drawImage(tintC, 0, 0);
-  for(const f of fishes) drawFishGlow(f);
-  const step = LAKE_FT > 200 ? 20 : 10;
-  for(let d=0; d<=LAKE_FT; d+=5){ const y=Math.round(SURF + d*FT); if(!onScreen(y,6)) continue; px(0, y, d%step===0?5:3, 1, 'rgba(239,227,200,.55)'); if(d>0 && d%step===0) pText(String(d), 7, y-2, 'rgba(239,227,200,.6)'); }
-  if(cy < SURF+20) pText('FT', 7, SURF+4, 'rgba(239,227,200,.4)');
   drawBoatAndFisher();
   drawLine();
   if(G.state==='landing'){ const a=G.landAnim; drawSprite(G.landed.sp.sprite, a.x, a.y, 1, time*8, a.rot); }
   if(G.relAnim){ const a=G.relAnim; drawSprite(a.sp.sprite, a.x, a.y, 1, time*8, a.rot); }
   for(const f of G.flyers) if(f.t >= 0) drawSprite(f.sp.sprite, f.x, f.y, 1, time*8, f.rot);
   drawDynamite();
-  drawAim();
   drawSplashes();
   for(const p of parts){
     if(p.t==='drop') px(p.x, p.y, 1, 1, p.c);
     else if(p.t==='debris'){ ctx.fillStyle=`rgba(${p.life>.5?'255,210,94':'120,110,100'},${Math.min(1,p.life*2)})`; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
     else if(p.t==='spark'){ ctx.fillStyle=`rgba(255,230,160,${Math.min(1,p.life*2)})`; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
   }
+  // Time of day: tint the whole scene, then add what glows in the dark
+  applyDayTint();
+  if(cy < SURF+4) drawNightSky();
+  { const r = G.rig, n = nightK(); if(r && r.lantern && n > 0){ lanternGlow(r.lantern.x, r.lantern.y, 46, n); px(r.lantern.x-1, r.lantern.y-1, 3, 3, `rgba(255,224,150,${.6+.4*n})`); px(r.lantern.x, r.lantern.y, 1, 1, '#fff6d8');
+      ctx.save(); ctx.globalCompositeOperation='lighter'; for(let i=0;i<6;i++){ const yy = SURF+3+i*2, ww = Math.max(1, 6-i)*(.6+.4*Math.sin(time*3+i)); ctx.fillStyle = `rgba(255,200,120,${.35*n})`; ctx.fillRect(Math.round(r.lantern.x-ww/2+Math.sin(time*2+i)*2), yy, Math.round(ww), 1); } ctx.restore(); } }
+  for(const f of fishes) drawFishGlow(f);
+  const step = LAKE_FT > 200 ? 20 : 10;
+  for(let d=0; d<=LAKE_FT; d+=5){ const y=Math.round(SURF + d*FT); if(!onScreen(y,6)) continue; px(0, y, d%step===0?5:3, 1, 'rgba(239,227,200,.55)'); if(d>0 && d%step===0) pText(String(d), 7, y-2, 'rgba(239,227,200,.6)'); }
+  if(cy < SURF+20) pText('FT', 7, SURF+4, 'rgba(239,227,200,.4)');
+  drawAim();
   if(G.state==='charging') drawCharge();
   drawGunHud();
   drawCrosshair();
@@ -2552,6 +2688,15 @@ function renderFishing(){
 }
 
 /* ================== HUD ================== */
+const SUN_SVG = '<svg viewBox="0 0 8 8"><rect x="3" y="0" width="2" height="1" fill="#ffd25e"/><rect x="3" y="7" width="2" height="1" fill="#ffd25e"/><rect x="0" y="3" width="1" height="2" fill="#ffd25e"/><rect x="7" y="3" width="1" height="2" fill="#ffd25e"/><rect x="2" y="2" width="4" height="4" fill="#ffd25e"/><rect x="3" y="1" width="2" height="6" fill="#ffd25e"/><rect x="1" y="3" width="6" height="2" fill="#ffd25e"/><rect x="3" y="3" width="1" height="1" fill="#fff4c0"/></svg>';
+const DUSK_SVG = '<svg viewBox="0 0 8 8"><rect x="2" y="3" width="4" height="2" fill="#ff9a4e"/><rect x="1" y="4" width="6" height="1" fill="#ff9a4e"/><rect x="3" y="2" width="2" height="1" fill="#ff9a4e"/><rect x="0" y="5" width="8" height="1" fill="#6f8fc4"/><rect x="1" y="6" width="6" height="1" fill="#4a6aa4"/></svg>';
+const MOON_SVG = '<svg viewBox="0 0 8 8"><rect x="2" y="1" width="3" height="1" fill="#e8ecf8"/><rect x="1" y="2" width="2" height="4" fill="#e8ecf8"/><rect x="2" y="6" width="3" height="1" fill="#e8ecf8"/><rect x="3" y="5" width="3" height="1" fill="#e8ecf8"/><rect x="3" y="2" width="1" height="1" fill="#e8ecf8"/><rect x="6" y="1" width="1" height="1" fill="#e8ecf8"/></svg>';
+let clockKey = '';
+function updateClockChip(){
+  const p = periodNow(), lbl = clockLabel(Math.floor(S.clock/10)*10), key = p.id + lbl; if(key === clockKey) return; clockKey = key;
+  $('clockName').textContent = p.name; $('clockVal').textContent = lbl;
+  $('clockIco').innerHTML = p.id==='night' || p.id==='evening' ? MOON_SVG : p.id==='dawn' || p.id==='dusk' ? DUSK_SVG : SUN_SVG;
+}
 const hintEl=$('hint'), gaugeEl=$('gauge'), gfill=$('gfill'), actionsEl=$('actions');
 let lastHint='', lastActions='';
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches;
@@ -2616,6 +2761,7 @@ function updateHud(){
   $('wVal').textContent = `${wt.toFixed(1)}/${b.maxW} lb`;
   $('holdChip').classList.toggle('full', S.inv.length>=b.cap);
   $('wChip').classList.toggle('full', wt >= b.maxW*.95);
+  updateClockChip();
   if(!WORLD){ setHint(''); setActions([]); return; }
   if(G.mode==='travel'){
     const info = waterHere();
@@ -2724,7 +2870,7 @@ function renderInv(){
   h += `<div class="toolbar"><span style="color:var(--bone-dim);font-size:12px">Hold value: <b style="color:var(--warn)">${fmt(S.inv.reduce((a,f)=>a+f.value,0))} coins</b>. Sell it at the harbor, the orange marker on your chart.</span></div>`;
   if(!S.inv.length) h += `<div class="empty">Your hold is empty.<br>Stop on open water, press Space and cast a line.</div>`;
   else h += `<div class="list">${S.inv.slice().reverse().map(f=>fishRow(f)).join('')}</div>`;
-  h += `<h4>Fish log</h4><div class="dex">${RT.map(sp=>{ const n=S.caught[sp.id]||0; return `<div class="${n?'':'unk'}"><img src="${sp.iconURL}" alt=""><span class="${n?'r'+sp.rarity:''}">${n?esc(sp.name):'Not caught yet'}</span><br><span style="color:var(--bone-dim)">${n?`Caught ${n}`:`${Math.round(sp.dmin)} to ${Math.round(sp.dmax)} ft`}</span></div>`; }).join('')}</div>`;
+  h += `<h4>Fish log</h4><div class="dex">${RT.map(sp=>{ const n=S.caught[sp.id]||0; return `<div class="${n?'':'unk'}"><img src="${sp.iconURL}" alt=""><span class="${n?'r'+sp.rarity:''}">${n?esc(sp.name):'Not caught yet'}</span><br><span style="color:var(--bone-dim)">${n?`Caught ${n}`:`${Math.round(sp.dmin)} to ${Math.round(sp.dmax)} ft`}${sp.time?`<br>${PERIOD_BY_ID[sp.time].name} only`:''}</span></div>`; }).join('')}</div>`;
   body.innerHTML = h;
 }
 function fishRow(f, sell){
@@ -2741,6 +2887,10 @@ function renderShop(tab){
     const total=S.inv.reduce((a,f)=>a+f.value,0);
     h += `<div class="toolbar"><span style="font-size:13px">${S.inv.length} fish in your hold, worth <b style="color:var(--warn)">${fmt(total)} coins</b></span><button class="btn" id="sellAll" ${S.inv.length?'':'disabled'}>Sell all for ${fmt(total)}</button></div>`;
     h += S.inv.length ? `<div class="list">${S.inv.slice().reverse().map(f=>fishRow(f,true)).join('')}</div>` : `<div class="empty">Nothing to sell yet.<br>Sail out, catch something and bring it back here.</div>`;
+  } else if(shopTab==='rest'){
+    const cur = periodNow();
+    h += `<p style="font-size:13px;margin:0 0 10px">It's <b style="color:var(--warn)">${cur.name.toLowerCase()}</b>, ${clockLabel(S.clock)}. Rest at the harbor to skip ahead. Some rare fish only come out at certain times of day.</p>`;
+    h += `<div class="grid">${PERIODS.map(p => `<div class="card ${p.id===cur.id?'eq':''}"><h3>${p.name}</h3><p>Starts at ${clockLabel(p.h*60)}.</p><div class="row"><span></span>${p.id===cur.id?'<button class="btn ghost sm" disabled>Now</button>':`<button class="btn sm" data-rest="${p.id}">Rest until ${p.name.toLowerCase()}</button>`}</div></div>`).join('')}</div>`;
   } else if(shopTab==='tackle'){
     h += tackleShop();
   } else {
@@ -2761,6 +2911,7 @@ function renderShop(tab){
     }).join('')}</div>`;
   }
   body.innerHTML=h;
+  body.querySelectorAll('[data-rest]').forEach(b=>b.onclick=()=>{ const p = PERIOD_BY_ID[b.dataset.rest]; S.clock = p.h*60; clockKey = ''; save(); sfx('coin'); toast(`You rest at the harbor until ${p.name.toLowerCase()}.`); renderShop(); });
   const sa=$('sellAll'); if(sa) sa.onclick=()=>{ const t=S.inv.reduce((a,f)=>a+f.value,0); S.coins+=t; S.inv=[]; save(); sfx('coin'); toast(`Sold your catch for ${fmt(t)} coins.`); renderShop(); };
   body.querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>{ const i=S.inv.findIndex(f=>f.uid===b.dataset.sell); if(i<0) return; const f=S.inv[i]; S.coins+=f.value; S.inv.splice(i,1); save(); sfx('coin'); toast(`Sold ${f.name} for ${fmt(f.value)} coins.`); renderShop(); });
   body.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{ const cat=shopTab, i=+b.dataset.buy, list=cat==='rod'?RODS:cat==='bait'?BAITS:BOATS, it=list[i]; if(S.coins<it.price) return; S.coins-=it.price; S.owned[cat].push(i); S[cat]=i; save(); sfx('coin'); toast(`Bought and equipped the ${it.name}.`); renderShop(); });
@@ -2961,6 +3112,7 @@ function update(dt){
   time += dt;
   shake = Math.max(0, shake - dt*18);
   if(G.trans) updateTrans(dt);
+  updateClock(dt);
   if(WORLD){ if(G.mode==='travel') updateTravel(dt); else updateFishing(dt); }
   miniT -= dt; if(G.mode==='travel' && miniT <= 0){ miniT = .15; renderMini(); }
   updateHud();

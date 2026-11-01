@@ -137,6 +137,8 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+.cico{display:inline-flex;width:14px;height:14px}.cico svg{width:14px;height:14px;shape-rendering:crispEdges}
+@media (max-width:600px){#clockVal{display:none}}
 .chip.threat{border-color:var(--bad)}
 .chip.threat .lbl{color:#ff9a9a}
 .chip.threat .pips i.on{background:var(--bad);border-color:var(--bad)}
@@ -278,6 +280,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <div class="chip" id="wChip" title="Weight in your boat's hold"><span class="lbl">Load</span><span id="wVal">0/30 lb</span></div>
     <div class="chip threat" id="threatChip" hidden title="Saltwight hits left"><span class="lbl">Saltwight</span><span class="pips" id="threatVal"></span></div>
     <div class="chip gunchip" id="gunChip" hidden title="Revolver ammo"><img src="" alt="" id="ammoIcon"><span class="cyl" id="cylPips"></span><span id="ammoVal"></span><span class="rbar" aria-label="Reloading"><i id="rbarFill"></i></span></div>
+    <div class="chip" id="clockChip" title="Time of day. Some rare fish only appear at certain times."><span class="cico" id="clockIco"></span><span class="lbl" id="clockName">Morning</span><span id="clockVal">8:00 AM</span></div>
     <div class="chip" id="depthChip" title="Water depth and lure"><span class="lbl" id="depthLbl">Water</span><span id="depthVal">dry</span></div>
   </div>
 
@@ -369,6 +372,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <button class="tab" role="tab" data-tab="bait">Bait and lures</button>
     <button class="tab" role="tab" data-tab="boat">Boats</button>
     <button class="tab" role="tab" data-tab="tackle">Gear</button>
+    <button class="tab" role="tab" data-tab="rest">Rest</button>
   </div>
   <div class="db" id="shopBody"></div>
 </dialog>
