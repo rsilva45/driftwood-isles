@@ -137,6 +137,7 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+.invstat{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.invstat .chip{font-size:14px}
 body.touch[data-mode=travel]{touch-action:none}
 #joy{position:fixed;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:2px solid rgba(239,227,200,.35);background:rgba(15,34,54,.25);z-index:40;pointer-events:none;opacity:0;transition:opacity .15s}
 #joy.on{opacity:1}#joy[hidden]{display:none}
@@ -289,18 +290,18 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
   <canvas id="fx" aria-hidden="true"></canvas>
 
   <div class="hud" id="hudL">
-    <div class="chip" title="Coins"><svg viewBox="0 0 8 8" width="14" height="14" style="shape-rendering:crispEdges"><rect x="2" y="0" width="4" height="8" fill="#ffd25e"/><rect x="0" y="2" width="8" height="4" fill="#ffd25e"/><rect x="1" y="1" width="6" height="6" fill="#ffd25e"/><rect x="3" y="2" width="2" height="4" fill="#c9962a"/></svg><b id="coinVal">0</b></div>
-    <div class="chip" id="holdChip" title="Fish in your boat's hold"><span class="lbl">Hold</span><span id="holdVal">0/8</span></div>
-    <div class="chip" id="wChip" title="Weight in your boat's hold"><span class="lbl">Load</span><span id="wVal">0/30 lb</span></div>
+    <div class="chip" id="coinChip" hidden title="Coins"><svg viewBox="0 0 8 8" width="14" height="14" style="shape-rendering:crispEdges"><rect x="2" y="0" width="4" height="8" fill="#ffd25e"/><rect x="0" y="2" width="8" height="4" fill="#ffd25e"/><rect x="1" y="1" width="6" height="6" fill="#ffd25e"/><rect x="3" y="2" width="2" height="4" fill="#c9962a"/></svg><b id="coinVal">0</b></div>
+    <div class="chip full" id="holdChip" hidden title="Your hold is full"><span class="lbl">Hold full</span><span id="holdVal">0/8</span></div>
+    <div class="chip" id="wChip" hidden title="Weight in your boat's hold"><span class="lbl">Load</span><span id="wVal">0/30 lb</span></div>
     <div class="chip threat" id="threatChip" hidden title="Saltwight hits left"><span class="lbl">Saltwight</span><span class="pips" id="threatVal"></span></div>
     <div class="chip gunchip" id="gunChip" hidden title="Revolver ammo"><img src="" alt="" id="ammoIcon"><span class="cyl" id="cylPips"></span><span id="ammoVal"></span><span class="rbar" aria-label="Reloading"><i id="rbarFill"></i></span></div>
-    <div class="chip" id="clockChip" title="Time of day. Some rare fish only appear at certain times."><span class="cico" id="clockIco"></span><span class="lbl" id="clockName">Morning</span><span id="clockVal">8:00 AM</span></div>
-    <div class="chip" id="depthChip" title="Water depth and lure"><span class="lbl" id="depthLbl">Water</span><span id="depthVal">dry</span></div>
+    <div class="chip" id="clockChip" hidden title="Time of day. Some rare fish only appear at certain times."><span class="cico" id="clockIco"></span><span class="lbl" id="clockName">Morning</span><span id="clockVal">8:00 AM</span></div>
+    <div class="chip" id="depthChip" hidden title="Water depth and lure"><span class="lbl" id="depthLbl">Water</span><span id="depthVal">dry</span></div>
   </div>
 
   <div class="hud" id="hudR">
     <button class="btn ghost" id="btnSail" title="Return to sailing (Esc)">Return to sail <kbd>Esc</kbd></button>
-    <button class="ibtn" id="btnInv" aria-label="Open boat hold (I)" title="Boat hold (I)">
+    <button class="ibtn" id="btnInv" aria-label="Open inventory (I)" title="Inventory (I): coins, time, hold">
       <svg viewBox="0 0 11 11"><rect x="3" y="1" width="5" height="1" fill="#efe3c8"/><rect x="2" y="2" width="1" height="2" fill="#efe3c8"/><rect x="8" y="2" width="1" height="2" fill="#efe3c8"/><rect x="1" y="4" width="9" height="6" fill="#c98a4b"/><rect x="1" y="4" width="9" height="1" fill="#e8b06e"/><rect x="4" y="6" width="3" height="2" fill="#6b4422"/></svg><kbd>I</kbd></button>
     
     <button class="ibtn" id="btnAdmin" aria-label="Open settings and admin (G)" title="Settings and admin (G)">
@@ -374,7 +375,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
 
 <!-- Inventory -->
 <dialog id="invDlg" aria-labelledby="invTitle">
-  <div class="dh"><h2 id="invTitle">Boat hold</h2><button class="x" data-close aria-label="Close">✕</button></div>
+  <div class="dh"><h2 id="invTitle">Inventory</h2><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="db" id="invBody"></div>
 </dialog>
 

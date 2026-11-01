@@ -137,6 +137,7 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+.invstat{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.invstat .chip{font-size:14px}
 body.touch[data-mode=travel]{touch-action:none}
 #joy{position:fixed;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:2px solid rgba(239,227,200,.35);background:rgba(15,34,54,.25);z-index:40;pointer-events:none;opacity:0;transition:opacity .15s}
 #joy.on{opacity:1}#joy[hidden]{display:none}
@@ -289,18 +290,18 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
   <canvas id="fx" aria-hidden="true"></canvas>
 
   <div class="hud" id="hudL">
-    <div class="chip" title="Coins"><svg viewBox="0 0 8 8" width="14" height="14" style="shape-rendering:crispEdges"><rect x="2" y="0" width="4" height="8" fill="#ffd25e"/><rect x="0" y="2" width="8" height="4" fill="#ffd25e"/><rect x="1" y="1" width="6" height="6" fill="#ffd25e"/><rect x="3" y="2" width="2" height="4" fill="#c9962a"/></svg><b id="coinVal">0</b></div>
-    <div class="chip" id="holdChip" title="Fish in your boat's hold"><span class="lbl">Hold</span><span id="holdVal">0/8</span></div>
-    <div class="chip" id="wChip" title="Weight in your boat's hold"><span class="lbl">Load</span><span id="wVal">0/30 lb</span></div>
+    <div class="chip" id="coinChip" hidden title="Coins"><svg viewBox="0 0 8 8" width="14" height="14" style="shape-rendering:crispEdges"><rect x="2" y="0" width="4" height="8" fill="#ffd25e"/><rect x="0" y="2" width="8" height="4" fill="#ffd25e"/><rect x="1" y="1" width="6" height="6" fill="#ffd25e"/><rect x="3" y="2" width="2" height="4" fill="#c9962a"/></svg><b id="coinVal">0</b></div>
+    <div class="chip full" id="holdChip" hidden title="Your hold is full"><span class="lbl">Hold full</span><span id="holdVal">0/8</span></div>
+    <div class="chip" id="wChip" hidden title="Weight in your boat's hold"><span class="lbl">Load</span><span id="wVal">0/30 lb</span></div>
     <div class="chip threat" id="threatChip" hidden title="Saltwight hits left"><span class="lbl">Saltwight</span><span class="pips" id="threatVal"></span></div>
     <div class="chip gunchip" id="gunChip" hidden title="Revolver ammo"><img src="" alt="" id="ammoIcon"><span class="cyl" id="cylPips"></span><span id="ammoVal"></span><span class="rbar" aria-label="Reloading"><i id="rbarFill"></i></span></div>
-    <div class="chip" id="clockChip" title="Time of day. Some rare fish only appear at certain times."><span class="cico" id="clockIco"></span><span class="lbl" id="clockName">Morning</span><span id="clockVal">8:00 AM</span></div>
-    <div class="chip" id="depthChip" title="Water depth and lure"><span class="lbl" id="depthLbl">Water</span><span id="depthVal">dry</span></div>
+    <div class="chip" id="clockChip" hidden title="Time of day. Some rare fish only appear at certain times."><span class="cico" id="clockIco"></span><span class="lbl" id="clockName">Morning</span><span id="clockVal">8:00 AM</span></div>
+    <div class="chip" id="depthChip" hidden title="Water depth and lure"><span class="lbl" id="depthLbl">Water</span><span id="depthVal">dry</span></div>
   </div>
 
   <div class="hud" id="hudR">
     <button class="btn ghost" id="btnSail" title="Return to sailing (Esc)">Return to sail <kbd>Esc</kbd></button>
-    <button class="ibtn" id="btnInv" aria-label="Open boat hold (I)" title="Boat hold (I)">
+    <button class="ibtn" id="btnInv" aria-label="Open inventory (I)" title="Inventory (I): coins, time, hold">
       <svg viewBox="0 0 11 11"><rect x="3" y="1" width="5" height="1" fill="#efe3c8"/><rect x="2" y="2" width="1" height="2" fill="#efe3c8"/><rect x="8" y="2" width="1" height="2" fill="#efe3c8"/><rect x="1" y="4" width="9" height="6" fill="#c98a4b"/><rect x="1" y="4" width="9" height="1" fill="#e8b06e"/><rect x="4" y="6" width="3" height="2" fill="#6b4422"/></svg><kbd>I</kbd></button>
     
     <button class="ibtn" id="btnAdmin" aria-label="Open settings and admin (G)" title="Settings and admin (G)">
@@ -374,7 +375,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
 
 <!-- Inventory -->
 <dialog id="invDlg" aria-labelledby="invTitle">
-  <div class="dh"><h2 id="invTitle">Boat hold</h2><button class="x" data-close aria-label="Close">✕</button></div>
+  <div class="dh"><h2 id="invTitle">Inventory</h2><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="db" id="invBody"></div>
 </dialog>
 
@@ -617,7 +618,7 @@ const dynMaxDepth = () => Math.min(dynBoomDepth(), LAKE_FT - 1);
 function aimDepth(){ return T.hover ? clamp((T.hover.y + camY - SURF)/FT, .5, dynMaxDepth()) : Math.min(10, dynMaxDepth()); }
 
 /* ================== Save ================== */
-function defaults(){ return {coins:25, inv:[], rod:0, bait:0, boat:0, owned:{rod:[0],bait:[0],boat:[0]}, custom:[], caught:{}, sound:true, shake:!REDUCED, world:null, net:-1, dyn:{count:0, fuse:0, radius:0, bag:0}, weapons:defaultWeapons(), clock:8*60, light:-1}; }
+function defaults(){ return {coins:25, inv:[], rod:0, bait:0, boat:0, owned:{rod:[0],bait:[0],boat:[0]}, custom:[], caught:{}, sound:true, shake:!REDUCED, world:null, net:-1, dyn:{count:0, fuse:0, radius:0, bag:0}, weapons:defaultWeapons(), clock:8*60, light:-1, seen:{}}; }
 function defaultWeapons(){ return {revolver:{lvl:-1, ammo:0, mag:0}, shotgun:{lvl:-1, ammo:0, mag:0}, sniper:{lvl:-1, ammo:0, mag:0}, lightning:{lvl:-1, ammo:0, mag:0, ammo2:0, alt:false}}; }
 function load(){
   try{
@@ -632,6 +633,7 @@ function load(){
     delete d.gun; delete d.ammo; delete d.cyl;
     for(const id of Object.keys(wd)){ const w = d.weapons[id] = Object.assign({}, wd[id], d.weapons[id]); w.lvl = clamp(w.lvl|0, -1, 3); w.ammo = Math.max(0, w.ammo|0); w.mag = Math.max(0, w.mag|0); if('ammo2' in wd[id]){ w.ammo2 = Math.max(0, w.ammo2|0); w.alt = !!w.alt; } }
     d.clock = Number.isFinite(d.clock) ? ((d.clock % 1440) + 1440) % 1440 : 8*60;
+    if(!d.seen || typeof d.seen !== 'object') d.seen = {};
     d.rod = clamp(d.rod|0, 0, RODS.length-1); d.bait = clamp(d.bait|0, 0, BAITS.length-1); d.boat = clamp(d.boat|0, 0, BOATS.length-1);
     return d;
   }catch(e){ return defaults(); }
@@ -1433,6 +1435,8 @@ function drawSplashes(){
 /* ================== Input ================== */
 const anyDialog = () => !!document.querySelector('dialog[open]');
 const fishInput = () => G.mode==='fish' && !G.trans && !anyDialog();
+const swActive = () => !!(M && !['dying','leave'].includes(M.state));
+let swCastWarnT = 0;
 function press(){
   if(!fishInput()) return;
   ac();
@@ -1440,18 +1444,19 @@ function press(){
   holding = true; holdFromWaiting = false;
   switch(G.state){
     case 'idle':
+      if(swActive() && !isGun(G.tool)){ holding = false; if(time - swCastWarnT > 3){ swCastWarnT = time; if(S.seen.swwarn) toast("Not with the Saltwight here."); } return; }
       if(G.tool==='net'){ if(S.net<0) return; if(S.inv.length >= boat().cap){ toast('Your hold is full. Sail back to the harbor to sell first.'); holding=false; return; } G.state='charging'; G.chargeTool='net'; G.power=0; G.pdir=1; return; }
       if(G.tool==='dyn'){ holding=false; throwDyn(); return; }
       if(isGun(G.tool)){ holding=false; fireGun(); return; }
       if(S.inv.length >= boat().cap){ toast('Your hold is full. Sail back to the harbor to sell, or upgrade your boat.'); holding=false; return; }
       G.state='charging'; G.chargeTool='rod'; G.power=0; G.pdir=1; break;
-    case 'sinking': G.state='waiting'; toast(`Lure set at ${G.lure.depth.toFixed(0)} ft`); break;
+    case 'sinking': G.state='waiting'; markSeen('sink'); break;
     case 'waiting': holdFromWaiting = true; break;
     case 'bite': hook(); break;
-    case 'net': holding=false; if(G.net && G.net.phase!=='up'){ G.net.phase='up'; sfx('net'); } break;
+    case 'net': holding=false; if(G.net && G.net.phase!=='up'){ G.net.phase='up'; sfx('net'); markSeen('net2'); } break;
   }
 }
-function release(){ holding = false; holdFromWaiting = false; if(G.state==='charging'){ if(G.chargeTool==='net') castNet(); else castLine(); } }
+function release(){ holding = false; holdFromWaiting = false; if(G.state==='charging'){ if(swActive()){ G.state = 'idle'; G.power = 0; return; } if(G.chargeTool==='net') castNet(); else castLine(); } }
 /* Ghost joystick (touch screens, sailing only): put a thumb down anywhere that isn't a button
    and a stick appears under it. Drag to steer; the further you drag, the faster you sail. */
 const IS_TOUCH_EARLY = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -1564,7 +1569,8 @@ function updateTrans(dt){
     if(tr.to==='fish'){
       setLake(tr.info); G.mode='fish'; camY = 40;
       const zl = BIOMES[BIOME].name;
-      toast(tr.info.spot ? `Hot spot! ${zl}, ${depthLabel(tr.info.depth)} deep.` : `${zl}, ${depthLabel(tr.info.depth)} deep.`);
+      if(tr.info.spot) toast(`Hot spot! ${zl}.`); else if(!S.seen['bio:'+BIOME]) toast(`${zl}, ${depthLabel(tr.info.depth)} deep.`);
+      markSeen('bio:'+BIOME);
     } else { if(M) toast('You left the Saltwight behind.'); M = null; G.mode='travel'; G.state='idle'; holding=false; saveWorld(); }
     document.body.dataset.mode = G.mode;
   }
@@ -1607,6 +1613,7 @@ function updateTravel(dt){
   else if(ok(T.x,ny)){ T.y = ny; T.spd *= .96; }
   else { if(Math.abs(T.spd) > 8 && T.bumpT <= 0){ sfx('bump'); doShake(2); T.bumpT = .5; } T.spd *= -.25; }
   T.bumpT -= dt;
+  if(Math.abs(T.spd) > 10 && !S.seen.sail) markSeen('sail');
   revealAround();
   // Wake: two trails off the stern plus a little bow spray
   T.wakeT -= dt;
@@ -1767,12 +1774,14 @@ function pileSlot(i, g){
 
 /* ================== Fishing actions ================== */
 function castLine(){
+  markSeen('cast');
   const r = G.rig, p = G.power;
   G.state='casting';
   G.cast = {t:0, dur:(.45+p*.45)/rod().cast, sx:r.tipX, sy:r.tipY, ex:Math.round(lerp(r.tipX+22, W-14, p)), arc:20+p*34};
   sfx('cast');
 }
 function hook(){
+  markSeen('bite'); markSeen('wait');
   const f = G.bite.fish; if(!f) return;
   G.state='reeling'; G.hooked=f; f.mode='hooked'; f.leapCd = 2; G.bite.fish=null;
   G.reel = {tension:30, rate:0, wheel:0, slack:0, snapT:0, burstT:0, burstCd:rand(1,2.4), pull:0, stamina:1, phi:.8, intentT:rand(.8,1.8)};
@@ -1795,6 +1804,7 @@ function escapeFish(){
   toast('It slipped the hook. Keep some tension on the line.');
 }
 function landFish(){
+  markSeen('reel');
   const f = G.hooked, sp = f.def;
   const w = +(sp.wmin + (sp.wmax-sp.wmin)*Math.pow(Math.random(),1.6)).toFixed(2);
   const k = (w-sp.wmin)/((sp.wmax-sp.wmin)||1);
@@ -1866,6 +1876,7 @@ $('haulDone').onclick = () => $('haulDlg').close();
 
 const netRange = () => 60 + S.net*22; // px past the bow; the rod reaches about twice as far
 function castNet(){
+  markSeen('net');
   const n = NETS[S.net], g = G.rig, bow = g.left + g.L;
   const cx = clamp(bow + 8 + n.w/2 + G.power*netRange(), bow + 6 + n.w/2, W - n.w/2 - 4);
   G.net = {phase:'fly', t:0, dur:(.4 + G.power*.35)/n.speed**.3, sx:g.tipX, sy:g.tipY, cx, fx:g.tipX, fy:g.tipY, x:Math.round(cx - n.w/2), d:0, max:Math.min(n.depth, LAKE_FT-1.5), hold:0, fish:[], tier:S.net};
@@ -1880,7 +1891,7 @@ function updateNet(dt){
     return;
   }
   if(N.phase==='down'){ N.d += 7*n.speed*dt; if(N.d >= N.max){ N.d = N.max; N.phase = 'hold'; N.hold = .6; } }
-  else if(N.phase==='hold'){ N.hold -= dt; if(N.hold <= 0){ N.phase = 'up'; sfx('net'); } }
+  else if(N.phase==='hold'){ N.hold -= dt; if(N.hold <= 0){ N.phase = 'up'; sfx('net'); markSeen('net2'); } }
   else { N.d -= 9*n.speed*dt; const bow = G.rig.left + G.rig.L + 2; N.x += (bow - N.x)*Math.min(1, dt*.35); } // hauling drags it back toward the boat
   // anything swimming into the mesh gets tangled, up to the net's capacity
   const top = SURF + N.d*FT;
@@ -1901,6 +1912,7 @@ function updateNet(dt){
   }
 }
 function throwDyn(){
+  markSeen('dyn');
   if(S.dyn.count <= 0){ toast('Out of dynamite. Buy more at the harbor shop.'); return; }
   if(S.inv.length >= boat().cap){ toast('Your hold is full. Sail back to the harbor to sell first.'); return; }
   S.dyn.count--; save();
@@ -1950,7 +1962,7 @@ function updateDyn(dt){
 }
 function explode(){
   const D = G.dyn, R = DYN.radius[S.dyn.radius].v;
-  D.phase = 'boom'; D.t = 0; D.R = R;
+  D.phase = 'boom'; D.t = 0; D.R = R; markSeen('dyn2');
   G.flashA = .75; doShake(9); sfx('boom'); buzz([80,40,120]);
   parts.push({t:'glow', x:D.x, y:D.y, R, life:.45, max:.45});
   parts.push({t:'shock', x:D.x, y:D.y, R, life:.5, max:.5});
@@ -2164,6 +2176,7 @@ function updateSaltwight(dt){
   if(M && !['breach','claw','hurt'].includes(M.state)) M.y = Math.max(M.y, SURF + 12);
 }
 function strikeSaltwight(){
+  markSeen('swwarn');
   if(!M || !M.strikeOpen) return;
   holding = false; M.strikeOpen = false;
   sfx('whack'); buzz(60);
@@ -2245,6 +2258,7 @@ function fireGun(){
   const m = gunMuzzle(id);
   let a = g.aim*Math.PI/180;
   if(T.hover){ const tx = T.hover.x, ty = T.hover.y + camY; if(tx > m.x + 2) a = Math.atan2(ty - m.y, tx - m.x); }
+  markSeen('gun:'+id);
   if(w.bolt){ st.mag--; g.cd = t.cool; g.shotT = 0; castBolt(m, a, t); if(st.mag === 0 && st.ammo > 0) g.pending = .35; save(); return; }
   st.mag--; g.cd = t.cool; g.shotT = 0; g.shotId = (g.shotId||0) + 1;
   const n = t.pellets || 1, spread = (t.spread || 0)*Math.PI/180;
@@ -2412,7 +2426,7 @@ function fireDelayed(){
   if(T.hover){ tx = T.hover.x; ty = T.hover.y + camY; }
   else { const a = g.aim*Math.PI/180; tx = m.x + Math.cos(a)*200; ty = m.y + Math.sin(a)*200; }
   ty = clamp(ty, SURF + 10, ABYSS ? maxY : Math.min(maxY, BED_Y - 8)); tx = clamp(tx, m.x + 6, W - 6);
-  st.ammo2--; g.cd = t.reload; g.shotT = 0;
+  st.ammo2--; g.cd = t.reload; g.shotT = 0; markSeen('gun:lightning:alt');
   G.orbs.push({x:m.x, y:m.y, tx, ty, phase:'fly', t:0, wet:false, tier:t});
   sfx('hum'); doShake(1.5); save();
 }
@@ -2702,7 +2716,7 @@ function updateFishing(dt){
     }
     case 'sinking':
       L.depth = Math.min(lureCap(), L.depth + bait().sink*dt);
-      if(L.depth >= lureCap()) G.state='waiting';
+      if(L.depth >= lureCap()){ G.state='waiting'; markSeen('sink'); }
       break;
     case 'waiting':
       if(holding && holdFromWaiting){
@@ -2714,7 +2728,7 @@ function updateFishing(dt){
     case 'bite':
       G.bite.t -= dt;
       L.x += Math.sin(time*50)*.3;
-      if(G.bite.t<=0){ const f=G.bite.fish; G.bite.fish=null; if(f) fleeFish(f); G.state='waiting'; sfx('miss'); toast('Missed the bite. Hook faster when you see the !'); }
+      if(G.bite.t<=0){ const f=G.bite.fish; G.bite.fish=null; if(f) fleeFish(f); G.state='waiting'; sfx('miss'); if(!S.seen.bite) toast('Missed the bite. Hook faster when you see the !'); }
       break;
     case 'reeling': updateReel(dt); break;
     case 'net': updateNet(dt); break;
@@ -3247,6 +3261,7 @@ function renderFishing(){
 }
 
 /* ================== HUD ================== */
+const COIN_SVG = '<svg viewBox="0 0 8 8" width="14" height="14" style="shape-rendering:crispEdges"><rect x="2" y="0" width="4" height="8" fill="#ffd25e"/><rect x="0" y="2" width="8" height="4" fill="#ffd25e"/><rect x="1" y="1" width="6" height="6" fill="#ffd25e"/><rect x="3" y="2" width="2" height="4" fill="#c9962a"/></svg>';
 const SUN_SVG = '<svg viewBox="0 0 8 8"><rect x="3" y="0" width="2" height="1" fill="#ffd25e"/><rect x="3" y="7" width="2" height="1" fill="#ffd25e"/><rect x="0" y="3" width="1" height="2" fill="#ffd25e"/><rect x="7" y="3" width="1" height="2" fill="#ffd25e"/><rect x="2" y="2" width="4" height="4" fill="#ffd25e"/><rect x="3" y="1" width="2" height="6" fill="#ffd25e"/><rect x="1" y="3" width="6" height="2" fill="#ffd25e"/><rect x="3" y="3" width="1" height="1" fill="#fff4c0"/></svg>';
 const DUSK_SVG = '<svg viewBox="0 0 8 8"><rect x="2" y="3" width="4" height="2" fill="#ff9a4e"/><rect x="1" y="4" width="6" height="1" fill="#ff9a4e"/><rect x="3" y="2" width="2" height="1" fill="#ff9a4e"/><rect x="0" y="5" width="8" height="1" fill="#6f8fc4"/><rect x="1" y="6" width="6" height="1" fill="#4a6aa4"/></svg>';
 const MOON_SVG = '<svg viewBox="0 0 8 8"><rect x="2" y="1" width="3" height="1" fill="#e8ecf8"/><rect x="1" y="2" width="2" height="4" fill="#e8ecf8"/><rect x="2" y="6" width="3" height="1" fill="#e8ecf8"/><rect x="3" y="5" width="3" height="1" fill="#e8ecf8"/><rect x="3" y="2" width="1" height="1" fill="#e8ecf8"/><rect x="6" y="1" width="1" height="1" fill="#e8ecf8"/></svg>';
@@ -3261,6 +3276,7 @@ let lastHint='', lastActions='';
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches;
 if(IS_TOUCH) document.body.classList.add('touch');
 const TOUCH_TEXT = [
+  ['Hold click or Space to cast.', 'Press and hold to cast, then let go.'],
   ['Click to fire lightning', 'Tap to fire lightning'], [' T switches to delayed cells.', ''], ['Click where the charge should burst', 'Tap where the charge should burst'],
   [' T switches cells. Scroll to look deeper.', ' Use the arrows to look deeper.'], ['Press T to switch back to power cells.', 'Tap Normal cells to switch back.'],
   ['Sail with W A S D or the arrow keys, or hold the mouse where you want to go.', 'Put your thumb down anywhere and drag to sail.'],
@@ -3286,6 +3302,9 @@ const TOUCH_TEXT = [
   ['Let go of the throttle and slow to a stop before casting.', 'Let go and slow to a stop before casting.'],
 ];
 function touchText(t){ if(!IS_TOUCH || !t) return t; for(const [a,b] of TOUCH_TEXT) t = t.split(a).join(b); return t; }
+// Tutorial hints show until you've done the thing once, then never again
+function markSeen(k){ if(!S.seen[k]){ S.seen[k] = 1; save(); } }
+function tipHint(key, t, alert){ setHint(S.seen[key] ? '' : t, alert); }
 function setHint(t, alert){ t = touchText(t); if(t!==lastHint){ hintEl.textContent=t; lastHint=t; } hintEl.classList.toggle('alert', !!alert); hintEl.style.display = t ? '' : 'none'; }
 function setActions(list){
   const key = list.map(a=>a.id).join('|'); if(key===lastActions) return; lastActions = key;
@@ -3319,55 +3338,54 @@ $('padReel').addEventListener('click', () => { if(G.mode==='fish' && (G.state===
 function updateHud(){
   updateTouchPad();
   { const sb = $('strikeBtn'), on = !!(M && M.strikeOpen && G.mode==='fish'); if(sb.hidden === on) sb.hidden = !on; }
-  $('coinVal').textContent = fmt(S.coins);
-  const b = boat(), wt = invWeight();
-  $('holdVal').textContent = `${S.inv.length}/${b.cap}`;
-  $('wVal').textContent = `${wt.toFixed(1)}/${b.maxW} lb`;
-  $('holdChip').classList.toggle('full', S.inv.length>=b.cap);
-  $('wChip').classList.toggle('full', wt >= b.maxW*.95);
+  // coins, time, hold and weight live in the inventory; the HUD only warns when the hold is full
+  const b = boat(), wt = invWeight(), full = S.inv.length>=b.cap || wt >= b.maxW*.98;
+  { const hc = $('holdChip'); if(hc.hidden === full) hc.hidden = !full; }
   updateClockChip();
   if(!WORLD){ setHint(''); setActions([]); return; }
   if(G.mode==='travel'){
     const info = waterHere();
-    $('depthLbl').textContent = 'Water';
-    $('depthVal').textContent = info ? `${depthLabel(info.depth)}, ${BIOMES[info.biome].name}` : '';
+    $('depthChip').hidden = true;
     const acts = [];
     if(nearHarbor()) acts.push({id:'harbor', label:'Enter harbor', key:'E'});
     if(stopped() && info) acts.push({id:'fish', label: info.spot ? 'Fish the hot spot' : 'Cast line', key:'Space'});
     setActions(G.trans ? [] : acts);
-    setHint(G.trans ? '' : stopped() ? 'Sail with W A S D or the arrow keys, or hold the mouse where you want to go.' : '');
+    if(G.trans || !stopped()) setHint(''); else tipHint('sail', 'Sail with W A S D or the arrow keys, or hold the mouse where you want to go.');
     gaugeEl.classList.remove('on');
     return;
   }
   setActions([]);
-  $('depthLbl').textContent = 'Lure';
-  const wet = isWet(), waterTxt = ABYSS ? '??? ft' : `${LAKE_FT} ft`;
-  $('depthVal').textContent = wet ? `${G.lure.depth.toFixed(0)} ft of ${Math.min(rod().depth, ABYSS ? rod().depth : LAKE_FT)}, water ${waterTxt}` : `dry, water ${waterTxt}, rod ${rod().depth} ft`;
+  const wet = isWet();
+  $('depthChip').hidden = !wet;   // the lure's depth, only while it's in the water
+  if(wet){ $('depthLbl').textContent = 'Lure'; $('depthVal').textContent = `${G.lure.depth.toFixed(0)} ft`; }
   const st = G.state;
   updateTools();
   updateThreat();
+  const swHere = swActive();
   if(M && M.strikeOpen) setHint('Strike! Click or press Space!', true);
+  else if(st==='idle' && swHere && !isGun(G.tool)) tipHint('swwarn', 'The Saltwight is here. You can\'t cast until it leaves. Strike when it attacks, or shoot it.', true);
   else if(st==='idle'){
     if(S.inv.length>=b.cap) setHint('Your hold is full. Press Esc to sail back to the harbor.');
-    else if(G.tool==='net'){ const n = NETS[S.net]; setHint(`Hold click or Space to throw the ${n.name}, then release. It sinks to ${Math.min(n.depth, LAKE_FT-1)} ft and holds ${n.cap} fish.`); }
+    else if(G.tool==='net'){ const n = NETS[S.net]; tipHint('net', `Hold click or Space to throw the ${n.name}, then release. It sinks to ${Math.min(n.depth, LAKE_FT-1)} ft and holds ${n.cap} fish.`); }
     else if(isGun(G.tool) && WEAPONS[G.tool].bolt){ const id = G.tool, st = WS(id), w = WEAPONS[id];
-      setHint(st.alt ? (st.ammo2 <= 0 ? 'Out of delayed power cells. Press T to switch back to power cells.' : G.gun.cd > 0 ? 'Charging the next delayed cell...' : `Click where the charge should burst (${st.ammo2} delayed cells). T switches cells. Scroll to look deeper.`)
-        : G.gun.reload ? 'Swapping in a fresh power cell...' : st.mag + st.ammo <= 0 ? 'Out of power cells. Buy more at the harbor shop.'
-        : `Click to fire lightning (${st.mag} bolt${st.mag===1?'':'s'} left in this cell, ${st.ammo} cells). T switches to delayed cells.`); }
+      if(st.alt) st.ammo2 <= 0 ? setHint('Out of delayed power cells. Press T to switch back to power cells.') : tipHint('gun:lightning:alt', 'Click where the charge should burst. T switches cells. Scroll to look deeper.');
+      else if(st.mag + st.ammo <= 0) setHint('Out of power cells. Buy more at the harbor shop.');
+      else tipHint('gun:lightning', 'Click to fire lightning. It jumps between fish. T switches to delayed cells.'); }
     else if(isGun(G.tool)){ const id = G.tool, st = WS(id), w = WEAPONS[id];
-      setHint(G.gun.reload ? 'Reloading...' : st.mag + st.ammo <= 0 ? `Out of ${w.ammoName.toLowerCase()}. Buy more at the harbor shop.`
-        : st.mag <= 0 && !w.auto ? 'Press R to reload.'
-        : `Click to shoot (${st.mag} loaded, ${st.ammo} spare). R reloads. Scroll to look deeper.`); }
-    else if(G.tool==='dyn') setHint(`Point where and how deep, then click or Space to throw (${S.dyn.count} left, reaches ${Math.round(dynMaxDepth())} ft).`);
-    else setHint('Hold click or Space to cast. Press Q for the tool wheel, Esc to sail on.');
+      if(G.gun.reload) setHint('');
+      else if(st.mag + st.ammo <= 0) setHint(`Out of ${w.ammoName.toLowerCase()}. Buy more at the harbor shop.`);
+      else if(st.mag <= 0 && !w.auto) setHint('Press R to reload.');
+      else tipHint('gun:'+id, `Click to shoot. R reloads. Scroll to look deeper.`); }
+    else if(G.tool==='dyn') tipHint('dyn', `Point where and how deep, then click or Space to throw (reaches ${Math.round(dynMaxDepth())} ft).`);
+    else tipHint('cast', 'Hold click or Space to cast. Press Q for the tool wheel, Esc to sail on.');
   }
-  else if(st==='net'){ const N = G.net, n = NETS[N.tier]; setHint(N.phase==='up' ? `Hauling the net up with ${N.fish.length} of ${n.cap} fish.` : `Net at ${N.d.toFixed(0)} of ${N.max.toFixed(0)} ft with ${N.fish.length} of ${n.cap} fish. Click to haul it up.`); }
-  else if(st==='dyn'){ const D = G.dyn; setHint(D.phase==='boom' ? 'Collecting the catch as it floats up.' : `Fuse: ${Math.max(0, D.fuse).toFixed(1)} s. Scroll or press W/S to move it up or down (max ${Math.round(dynMaxDepth())} ft).`, D.phase!=='boom'); }
-  else if(st==='charging') setHint(G.chargeTool==='net' ? 'Release to throw the net. It lands closer than a rod cast.' : 'Release to cast. More power casts farther.');
-  else if(st==='sinking') setHint('Sinking. Click to stop at this depth, or scroll to adjust.');
-  else if(st==='waiting') setHint('Scroll to raise or lower the lure. Hold to reel in. R pulls the line out.');
-  else if(st==='bite') setHint('Bite! Click or press Space now!', true);
-  else if(st==='reeling') setHint(G.hooked && G.hooked.jump ? 'It jumped! Keep the line tight.' : 'Reel it all the way to the boat. Ease off when the gauge turns red.');
+  else if(st==='net'){ const N = G.net, n = NETS[N.tier]; if(S.seen.net2) setHint(''); else setHint(N.phase==='up' ? `Hauling the net up with ${N.fish.length} of ${n.cap} fish.` : `Net at ${N.d.toFixed(0)} of ${N.max.toFixed(0)} ft with ${N.fish.length} of ${n.cap} fish. Click to haul it up.`); }
+  else if(st==='dyn'){ const D = G.dyn; if(S.seen.dyn2) setHint(''); else setHint(D.phase==='boom' ? 'Collecting the catch as it floats up.' : `Fuse: ${Math.max(0, D.fuse).toFixed(1)} s. Scroll or press W/S to move it up or down (max ${Math.round(dynMaxDepth())} ft).`, D.phase!=='boom'); }
+  else if(st==='charging') tipHint(G.chargeTool==='net' ? 'net' : 'cast', G.chargeTool==='net' ? 'Release to throw the net. It lands closer than a rod cast.' : 'Release to cast. More power casts farther.');
+  else if(st==='sinking') tipHint('sink', 'Sinking. Click to stop at this depth, or scroll to adjust.');
+  else if(st==='waiting') tipHint('wait', 'Scroll to raise or lower the lure. Hold to reel in. R pulls the line out.');
+  else if(st==='bite') tipHint('bite', 'Bite! Click or press Space now!', true);
+  else if(st==='reeling') tipHint('reel', 'Reel it all the way to the boat. Ease off when the gauge turns red.');
   else setHint('');
   gaugeEl.classList.toggle('on', st==='reeling');
   if(st==='reeling'){
@@ -3432,7 +3450,9 @@ function closeCatch(){ $('catchDlg').close(); G.landed=null; G.state='idle'; }
 
 function renderInv(){
   const b=boat(), wt=invWeight(), body=$('invBody');
-  let h = `<div class="summary"><div><label>Fish: ${S.inv.length} of ${b.cap}</label><div class="bar"><i style="width:${Math.min(100,S.inv.length/b.cap*100)}%;background:${S.inv.length>=b.cap?'var(--bad)':'var(--good)'}"></i></div></div>
+  const per = periodNow(), ico = per.id==='night' || per.id==='evening' ? MOON_SVG : per.id==='dawn' || per.id==='dusk' ? DUSK_SVG : SUN_SVG;
+  let h = `<div class="invstat"><div class="chip" title="Coins">${COIN_SVG}<b>${fmt(S.coins)}</b> coins</div><div class="chip" title="Time of day"><span class="cico">${ico}</span><span class="lbl">${per.name}</span><span>${clockLabel(S.clock)}</span></div></div>`;
+  h += `<div class="summary"><div><label>Fish: ${S.inv.length} of ${b.cap}</label><div class="bar"><i style="width:${Math.min(100,S.inv.length/b.cap*100)}%;background:${S.inv.length>=b.cap?'var(--bad)':'var(--good)'}"></i></div></div>
     <div><label>Weight: ${wt.toFixed(1)} of ${b.maxW} lb</label><div class="bar"><i style="width:${Math.min(100,wt/b.maxW*100)}%;background:${wt>=b.maxW*.95?'var(--bad)':'var(--good)'}"></i></div></div></div>`;
   h += equipmentRow();
   h += `<div class="toolbar"><span style="color:var(--bone-dim);font-size:12px">Hold value: <b style="color:var(--warn)">${fmt(S.inv.reduce((a,f)=>a+f.value,0))} coins</b>. Sell it at the harbor, the orange marker on your chart.</span></div>`;
@@ -3626,7 +3646,7 @@ document.addEventListener('touchend', e => {
   lastTouchEnd = now;
 }, {passive:false});
 document.addEventListener('touchmove', e => { if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
-if(IS_TOUCH && document.body.classList.contains('portrait')) setTimeout(() => toast('Tip: turn your phone sideways for a bigger view.'), 1400);
+if(IS_TOUCH && document.body.classList.contains('portrait') && !S.seen.rotate) setTimeout(() => { toast('Tip: turn your phone sideways for a bigger view.'); markSeen('rotate'); }, 1400);
 function update(dt){
   time += dt;
   shake = Math.max(0, shake - dt*18);
