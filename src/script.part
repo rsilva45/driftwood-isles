@@ -541,9 +541,9 @@ function bandFill(g, x, y, w, h, stops, bands){
 }
 
 /* ================== Day and night ==================
-   One full day takes 24 real minutes: one game minute per real second.
+   One full day takes 15 real minutes.
    S.clock is the time of day in game minutes (0 to 1439). */
-const DAY_REAL_SEC = 24*60, GAME_MIN_PER_SEC = 1440/DAY_REAL_SEC;
+const DAY_REAL_SEC = 15*60, GAME_MIN_PER_SEC = 1440/DAY_REAL_SEC;
 const PERIODS = [ // in order through the day; each starts at hour h
   {id:'dawn',      name:'Dawn',      h:5},
   {id:'morning',   name:'Morning',   h:7},
@@ -2525,82 +2525,10 @@ function buyTackle(k){
 document.querySelectorAll('#shopDlg .tab').forEach(t=>t.onclick=()=>renderShop(t.dataset.tab));
 
 /* ================== Admin ================== */
-$('fRar').innerHTML = RARITIES.map((r,i)=>`<option value="${i}">${r}</option>`).join('');
-const sliders = {fDepth:v=>v+' ft', fRange:v=>'±'+v+' ft', fSpeed:v=>v+'/10', fDiff:v=>v+'/10', fValue:v=>fmt(+v)+' coins', fWeight:v=>(+v).toFixed(1)+' lb', fSize:v=>v+' px'};
-const outFor = {fDepth:'oDepth', fRange:'oRange', fSpeed:'oSpeed', fDiff:'oDiff', fValue:'oValue', fWeight:'oWeight', fSize:'oSize'};
-function syncOutputs(){ for(const k in sliders) $(outFor[k]).textContent = sliders[k]($(k).value); }
-for(const k in sliders) $(k).addEventListener('input', syncOutputs);
-syncOutputs();
-const adm = {frames:[], icon:null};
-function readImage(file, maxDim=96){
-  return new Promise((res, rej) => {
-    const fr = new FileReader();
-    fr.onerror = () => rej(new Error('read'));
-    fr.onload = () => {
-      const img = new Image();
-      img.onerror = () => rej(new Error('decode'));
-      img.onload = () => {
-        const s = Math.min(1, maxDim/Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width*s)), h = Math.max(1, Math.round(img.height*s));
-        const [c, g] = mk(w, h); g.imageSmoothingEnabled = s<1; g.imageSmoothingQuality='high';
-        g.drawImage(img, 0, 0, w, h); res(c.toDataURL('image/png'));
-      };
-      img.src = fr.result;
-    };
-    fr.readAsDataURL(file);
-  });
-}
-$('fFrames').addEventListener('change', async e => {
-  const all=[...e.target.files], err=$('fFramesErr'); err.textContent='';
-  const files = all.filter(f=>f.type==='image/png');
-  if(files.length<all.length) err.textContent='Only PNG files are used. Other files were skipped.';
-  if(files.length>3) err.textContent='Using the first 3 frames.';
-  try{ adm.frames = await Promise.all(files.slice(0,3).map(f=>readImage(f))); }
-  catch(x){ adm.frames=[]; err.textContent="One of those images couldn't be read. Try exporting it again as PNG."; }
-  $('tFrames').innerHTML = adm.frames.map((s,i)=>`<img src="${s}" alt="Frame ${i+1}">`).join('');
-});
-$('fIcon').addEventListener('change', async e => {
-  const f=e.target.files[0], err=$('fIconErr'); err.textContent=''; adm.icon=null; $('tIcon').innerHTML='';
-  if(!f) return;
-  if(f.type!=='image/png'){ err.textContent='The icon must be a PNG file.'; return; }
-  try{ adm.icon = await readImage(f, 128); $('tIcon').innerHTML=`<img src="${adm.icon}" alt="Icon">`; }
-  catch(x){ err.textContent="That image couldn't be read. Try exporting it again as PNG."; }
-});
-$('fName').addEventListener('input', ()=>$('fNameErr').textContent='');
-$('fName').addEventListener('blur', ()=>{ if(!$('fName').value.trim()) $('fNameErr').textContent='Give your fish a name.'; });
-$('fishForm').addEventListener('reset', ()=>{ setTimeout(()=>{ adm.frames=[]; adm.icon=null; $('tFrames').innerHTML=''; $('tIcon').innerHTML=''; ['fNameErr','fFramesErr','fIconErr'].forEach(i=>$(i).textContent=''); syncOutputs(); }, 0); });
-$('fishForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const name = $('fName').value.trim();
-  if(!name){ $('fNameErr').textContent='Give your fish a name.'; $('fName').focus(); return; }
-  const pref=+$('fDepth').value, range=+$('fRange').value, avgW=+$('fWeight').value;
-  const def = {id:'c_'+Date.now().toString(36), custom:true, name, rarity:+$('fRar').value,
-    dmin:Math.max(.8,pref-range), dmax:Math.min(595,pref+range), speed:+$('fSpeed').value, diff:+$('fDiff').value, value:+$('fValue').value,
-    wmin:+(avgW*.6).toFixed(2), wmax:+(avgW*1.4).toFixed(2), size:+$('fSize').value, color:$('fColor').value, facesLeft:$('fLeft').checked,
-    frames:adm.frames.slice(), icon:adm.icon};
-  S.custom.push(def);
-  if(!save()){ S.custom.pop(); return; }
-  const rt = buildRuntime(def); RT.push(rt); byId[rt.id]=rt;
-  if(G.mode==='fish' && def.dmin < LAKE_FT-1){ spawnFish(rt, true, Math.min(pref, LAKE_FT-2)); toast(`${name} is in the water here. Look around ${Math.min(pref, LAKE_FT-2)} ft.`); }
-  else toast(`${name} added. Look for it in water at least ${Math.round(def.dmin)} ft deep.`);
-  $('fishForm').reset(); renderCustomList();
-});
-function renderCustomList(){
-  const el=$('customList');
-  if(!S.custom.length){ el.innerHTML=`<div class="empty">No custom fish yet. Fill in the form above to add one.</div>`; return; }
-  el.innerHTML = S.custom.map(d=>{ const r=byId[d.id]; return `<div class="fishrow"><img src="${r?r.iconURL:GENERIC_ICON}" alt=""><div class="meta"><strong>${esc(d.name)}</strong><span class="r${d.rarity}">${RARITIES[d.rarity]}</span> <span style="color:var(--bone-dim)">${d.dmin.toFixed(0)} to ${d.dmax.toFixed(0)} ft, ${fmt(d.value)} coins</span></div><button class="btn ghost sm" data-spawn="${d.id}">Spawn</button><button class="btn danger sm" data-del="${d.id}">Delete</button></div>`; }).join('');
-  el.querySelectorAll('[data-spawn]').forEach(b=>b.onclick=()=>{ const r=byId[b.dataset.spawn]; if(!r) return; if(G.mode!=='fish'){ toast('Start fishing first, then spawn it.'); return; } spawnFish(r,true,Math.min(LAKE_FT-2, (r.dmin+r.dmax)/2)); toast(`Released a ${r.name}.`); });
-  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
-    if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Confirm delete'; setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=''; b.textContent='Delete'; } }, 3000); return; }
-    const id=b.dataset.del, d=S.custom.find(c=>c.id===id);
-    S.custom=S.custom.filter(c=>c.id!==id); save();
-    if(G.hooked && G.hooked.def.id===id){ G.hooked=null; G.state='waiting'; }
-    if(G.bite.fish && G.bite.fish.def.id===id){ G.bite.fish=null; G.state='waiting'; }
-    fishes=fishes.filter(f=>f.def.id!==id); RT=RT.filter(r=>r.id!==id); delete byId[id];
-    toast(`Deleted ${d?d.name:'fish'}.`); renderCustomList();
-  });
-}
-function renderAdmin(){ $('optSound').checked=S.sound; $('optShake').checked=S.shake; renderCustomList(); renderSaveStatus(); }
+function syncTimeSlider(){ $('admTime').value = Math.round(S.clock); $('oTime').textContent = `${clockLabel(S.clock)}, ${periodNow().name.toLowerCase()}`; }
+$('admTime').addEventListener('input', () => { S.clock = +$('admTime').value; clockKey = ''; $('oTime').textContent = `${clockLabel(S.clock)}, ${periodNow().name.toLowerCase()}`; });
+$('admTime').addEventListener('change', () => save());
+function renderAdmin(){ $('optSound').checked=S.sound; $('optShake').checked=S.shake; syncTimeSlider(); renderSaveStatus(); }
 $('saveFile').onclick = saveToFile;
 $('loadFile').onclick = () => $('loadInput').click();
 $('loadInput').onchange = e => { const f = e.target.files[0]; if(f) readSaveFile(f); e.target.value=''; };

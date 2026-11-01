@@ -400,29 +400,9 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     </div>
 
     <div class="section">
-      <h3 style="margin:0 0 4px;font-size:16px">Create a custom fish</h3>
-      <p style="margin:0 0 14px;color:var(--bone-dim);font-size:12px;line-height:1.5">Your fish joins the spawn pool right away. Custom fish show up more often in deeper water. Images are shrunk to 96 px and saved in this browser.</p>
-      <form id="fishForm" class="form" novalidate>
-        <div class="f"><label for="fName">Name</label><input type="text" id="fName" maxlength="28" placeholder="e.g. Moonscale Eel" autocomplete="off"><span class="err" id="fNameErr"></span></div>
-        <div class="f"><label for="fRar">Rarity</label><select id="fRar"></select></div>
-        <div class="f"><label for="fDepth">Preferred depth <output id="oDepth"></output></label><input type="range" id="fDepth" min="1" max="590" step="1" value="40"></div>
-        <div class="f"><label for="fRange">Depth spread <output id="oRange"></output></label><input type="range" id="fRange" min="1" max="80" step="1" value="15"></div>
-        <div class="f"><label for="fSpeed">Swim speed <output id="oSpeed"></output></label><input type="range" id="fSpeed" min="1" max="10" step="1" value="5"></div>
-        <div class="f"><label for="fDiff">Reel difficulty <output id="oDiff"></output></label><input type="range" id="fDiff" min="1" max="10" step="1" value="4"></div>
-        <div class="f"><label for="fValue">Coin value <output id="oValue"></output></label><input type="range" id="fValue" min="1" max="3000" step="1" value="60"></div>
-        <div class="f"><label for="fWeight">Average weight <output id="oWeight"></output></label><input type="range" id="fWeight" min="0.2" max="80" step="0.1" value="3"></div>
-        <div class="f"><label for="fSize">Size on screen <output id="oSize"></output></label><input type="range" id="fSize" min="8" max="48" step="1" value="20"></div>
-        <div class="f"><label for="fColor">Fallback color</label><div class="flexw"><input type="color" id="fColor" value="#4fc3a1"><small>Used when no frames are uploaded.</small></div></div>
-        <div class="f wide"><label for="fFrames">Swim animation frames (up to 3 PNGs)</label><input type="file" id="fFrames" accept="image/png" multiple><small>Draw the fish facing right, or tick the box below.</small><div class="thumbs" id="tFrames"></div><span class="err" id="fFramesErr"></span></div>
-        <div class="f"><label for="fIcon">Inventory icon (1 PNG)</label><input type="file" id="fIcon" accept="image/png"><div class="thumbs" id="tIcon"></div><span class="err" id="fIconErr"></span></div>
-        <div class="f"><span>&nbsp;</span><label class="lab"><input type="checkbox" id="fLeft"> My frames face left</label></div>
-        <div class="f wide"><div class="flexw"><button class="btn" type="submit">Add fish to lake</button><button class="btn ghost" type="reset">Clear form</button></div></div>
-      </form>
-    </div>
-
-    <div class="section">
-      <h3 style="margin:0 0 8px;font-size:16px">Custom fish</h3>
-      <div class="list" id="customList"></div>
+      <h3 style="margin:0 0 4px;font-size:16px">Time of day</h3>
+      <p style="margin:0 0 10px;color:var(--bone-dim);font-size:12px;line-height:1.5">Drag to set the clock. A full day takes 15 real minutes.</p>
+      <div class="f"><label for="admTime">Clock <output id="oTime"></output></label><input type="range" id="admTime" min="0" max="1439" step="10" value="480"></div>
     </div>
 
     <div class="section">
