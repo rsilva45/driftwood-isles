@@ -137,6 +137,16 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+.restbox{max-width:420px;margin:0 auto;text-align:center;display:flex;flex-direction:column;gap:14px}
+.restbox p{font-size:13px;margin:0;line-height:1.5}
+.restpick{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px;border:2px solid var(--line);background:rgba(15,34,54,.6)}
+.restpick strong{display:block;font-size:22px;color:var(--bone);text-align:left}.restpick span{display:block;font-size:12px;color:var(--bone-dim);text-align:left}
+.cico.big{width:40px;height:40px}.cico.big svg{width:40px;height:40px}
+#sleepFade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .8s ease;z-index:9999;display:flex;align-items:center;justify-content:center}
+#sleepFade.on{opacity:1;pointer-events:auto}
+#sleepFade span{color:var(--bone);font-size:16px;letter-spacing:.04em}
+.card.locked{opacity:.7}
+.gunchip.swap{cursor:pointer}
 .cico{display:inline-flex;width:14px;height:14px}.cico svg{width:14px;height:14px;shape-rendering:crispEdges}
 @media (max-width:600px){#clockVal{display:none}}
 .chip.threat{border-color:var(--bad)}
@@ -308,6 +318,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
   <div id="touchPad" aria-label="Depth controls">
     <button class="pad wide" id="padReel">Reel in</button>
     <button class="pad wide" id="padReload" hidden>Reload</button>
+    <button class="pad wide" id="padAmmo" hidden>Cells</button>
     <button class="pad" id="padUp" aria-label="Shallower">▲</button>
     <button class="pad" id="padDown" aria-label="Deeper">▼</button>
   </div>
@@ -364,6 +375,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
 </dialog>
 
 <!-- Shop -->
+<div id="sleepFade" aria-hidden="true"><span></span></div>
 <dialog id="shopDlg" aria-labelledby="shopTitle">
   <div class="dh"><h2 id="shopTitle">Harbor shop</h2><div class="flexw"><span class="price" id="shopCoins"></span><button class="x" data-close aria-label="Close">✕</button></div></div>
   <div class="tabs" role="tablist">
@@ -372,6 +384,8 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <button class="tab" role="tab" data-tab="bait">Bait and lures</button>
     <button class="tab" role="tab" data-tab="boat">Boats</button>
     <button class="tab" role="tab" data-tab="tackle">Gear</button>
+    <button class="tab" role="tab" data-tab="weapons">Weapons</button>
+    <button class="tab" role="tab" data-tab="ammo">Ammo</button>
     <button class="tab" role="tab" data-tab="rest">Rest</button>
   </div>
   <div class="db" id="shopBody"></div>
