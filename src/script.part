@@ -307,25 +307,63 @@ const bandOf = d => { let i=0; while(i<BANDS.length && d>BANDS[i]) i++; return i
 const ABYSS_D = 9999;
 
 let WORLD = null;
+// Biome regions: the starting shallows sit in the middle and seven large wedges fan out around them,
+// clockwise from the frozen north. Each wedge shapes its own depth and how many islands it has.
+const SECTORS = ['frozen','kelp','open','deep','volcanic','reef','mangrove'];
+const SECTOR_RULES = { // depth floor and cap in ft, how much land (negative = more islands)
+  shallows:{lo:8,   hi:38,   land:0},
+  mangrove:{lo:8,   hi:28,   land:-.11},
+  reef:    {lo:8,   hi:46,   land:-.02},
+  kelp:    {lo:30,  hi:130,  land:0},
+  open:    {lo:30,  hi:9999, land:.02},
+  deep:    {lo:150, hi:9999, land:.12},
+  volcanic:{lo:40,  hi:9999, land:-.02},
+  frozen:  {lo:8,   hi:9999, land:0},
+};
+function regionAt(x, y, N, nW, nR2){
+  const cx = N/2, cy = N/2, dx = x-cx, dy = y-cy, r = Math.hypot(dx, dy);
+  const core = N*.13 + (fbm(nR2, x/12, y/12, 3) - .5)*N*.07; // the starting shallows
+  if(r < core) return {b:'shallows', w:null, wk:0};
+  const warp = (fbm(nW, x/22, y/22, 3) - .5)*1.6;
+  let a = Math.atan2(dy, dx) + Math.PI/2 + warp; a = ((a % (Math.PI*2)) + Math.PI*2) % (Math.PI*2); // 0 = north, clockwise
+  const n = SECTORS.length, f = a/(Math.PI*2)*n, i = Math.floor(f) % n, fr = f - Math.floor(f);
+  // near a border, blend the depth with the neighbor so the sea floor doesn't jump
+  const edge = .18; let w = null, wk = 0;
+  if(fr < edge){ w = SECTORS[(i+n-1)%n]; wk = .5*(1 - fr/edge); }
+  else if(fr > 1-edge){ w = SECTORS[(i+1)%n]; wk = .5*(1 - (1-fr)/edge); }
+  // and blend toward the shallows just outside the core
+  const ck = clamp(1 - (r - core)/(N*.05), 0, 1);
+  return {b:SECTORS[i], w, wk, ck};
+}
 function genWorld(size, seed){
   const N = MAP_N[size], noise = makeNoise(seed), noise2 = makeNoise(seed ^ 0x5bd1e995), rnd = mulberry32(seed ^ 0x27d4eb2d);
-  const cx = N/2, cy = N/2;
-  const land = new Uint8Array(N*N), depth = new Float32Array(N*N);
+  const nW = makeNoise(seed ^ 0x1f3a9b), nR2 = makeNoise(seed ^ 0x2b77d4);
+  const cx = N/2, cy = N/2, MAXD = MAX_DEPTH[size];
+  const land = new Uint8Array(N*N), depth = new Float32Array(N*N), biome = new Uint8Array(N*N), cold = new Uint8Array(N*N);
+  const fit = (d, b) => { const R = SECTOR_RULES[b]; return clamp(d, Math.min(R.lo, MAXD*.6), Math.min(R.hi, MAXD)); };
   for(let y=0;y<N;y++) for(let x=0;x<N;x++){
-    const i = y*N+x, r = Math.hypot(x-cx, y-cy);
+    const i = y*N+x, r = Math.hypot(x-cx, y-cy), reg = regionAt(x, y, N, nW, nR2), R = SECTOR_RULES[reg.b];
+    const landBias = reg.w ? lerp(R.land, SECTOR_RULES[reg.w].land, reg.wk) : R.land;
     let e = fbm(noise, x/22, y/22, 4);
     e += .5*Math.max(0, 1 - r/8);                 // starting island
     e -= .16*Math.max(0, 1 - Math.abs(r-14)/6);  // open water around it
     const edge = Math.min(x, y, N-1-x, N-1-y); if(edge < 5) e -= (5-edge)*.12;
-    const th = .62 + .09*Math.min(1, r/80);
+    const th = .62 + .09*Math.min(1, r/80) + (r > 20 ? landBias : 0);
     if(e > th) land[i] = e > th+.24 ? 4 : e > th+.15 ? 3 : e > th+.06 ? 2 : 1;
-    let d = Math.min(MAX_DEPTH[size], depthAt(r/(N/2))*(.88 + .24*fbm(noise2, x/14, y/14, 3)));
+    let d = Math.min(MAXD, depthAt(r/(N/2))*(.88 + .24*fbm(noise2, x/14, y/14, 3)));
+    // each region keeps its sea floor in its own range, blended at the borders
+    let dd = fit(d, reg.b);
+    if(reg.w) dd = lerp(dd, fit(d, reg.w), reg.wk);
+    if(reg.ck) dd = lerp(dd, fit(d, 'shallows'), reg.ck*.8);
+    d = dd;
     const k = clamp((th - e)/.18, 0, 1);
     d = Math.max(8, d*(.35 + .65*k));
-    if(size==='large' && r > N*.45 && k > .55) d = ABYSS_D;
+    if(reg.b==='deep') d = Math.max(d, Math.min(120, MAXD*.5)*(.4 + .6*k)); // deep water drops away fast from its few islands
+    if(size==='large' && reg.b==='deep' && r > N*.4 && k > .55) d = ABYSS_D;
     depth[i] = land[i] ? 0 : d;
+    biome[i] = d >= ABYSS_D ? B.abyss : B[reg.b];
+    cold[i] = reg.b==='frozen' ? 1 : 0;
   }
-  const {biome, cold} = genBiomes(N, seed, land, depth, cx, cy, MAX_DEPTH[size]);
   // Harbor: walk east from the island center to the first water tile
   let hx = Math.floor(cx), hy = Math.floor(cy);
   while(hx < N-2 && land[hy*N+hx+1]) hx++;
@@ -350,39 +388,6 @@ function genWorld(size, seed){
   for(let i=0;i<N*N;i++){ w.fogImg.data[i*4]=8; w.fogImg.data[i*4+1]=14; w.fogImg.data[i*4+2]=26; w.fogImg.data[i*4+3]=255; }
   w.fogDirty = true;
   return w;
-}
-// Biomes come from the depth, the distance to land and a few large noise fields.
-// The far north is frozen; volcanic patches sit in deeper water; reefs and mangroves hug the shallows.
-function genBiomes(N, seed, land, depth, cx, cy, maxD){
-  const deepAt = Math.min(250, maxD*.78);
-  const nC = makeNoise(seed ^ 0x1f3a9b), nV = makeNoise(seed ^ 0x6c2e11), nR = makeNoise(seed ^ 0x2b77d4), nM = makeNoise(seed ^ 0x51a0c3), nK = makeNoise(seed ^ 0x7e19f5);
-  // distance to land in tiles, up to 4
-  const dist = new Uint8Array(N*N).fill(9), q = [];
-  for(let i=0;i<N*N;i++) if(land[i]){ dist[i] = 0; q.push(i); }
-  for(let h=0; h<q.length; h++){ const i = q[h], x = i%N, y = (i/N)|0, d = dist[i] + 1; if(d > 4) continue;
-    for(const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]){ if(nx<0||ny<0||nx>=N||ny>=N) continue; const n = ny*N+nx; if(dist[n] > d){ dist[n] = d; q.push(n); } } }
-  const biome = new Uint8Array(N*N), cold = new Uint8Array(N*N);
-  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
-    const i = y*N+x, r = Math.hypot(x-cx, y-cy), d = depth[i];
-    const north = y/N + (fbm(nC, x/14, y/14, 3) - .5)*.9 + Math.sin(x/N*9 + seed%7)*.035;
-    const frozen = north < .14 && r > 28;
-    cold[i] = frozen ? 1 : 0;
-    if(land[i]) continue;
-    let b;
-    if(d >= ABYSS_D) b = B.abyss;
-    else if(frozen) b = B.frozen;
-    else if(d >= 60 && r > 26 && fbm(nV, x/17, y/17, 3) > .64) b = B.volcanic;
-    else if(d < 40){
-      if(dist[i] <= 3 && d < 30 && fbm(nM, x/9, y/9, 3) > .44) b = B.mangrove;
-      else if(fbm(nR, x/11, y/11, 3) > .5) b = B.reef;
-      else b = B.shallows;
-    }
-    else if(d < 130) b = fbm(nK, x/13, y/13, 3) > .5 ? B.kelp : B.open;
-    else if(d < deepAt) b = B.open;
-    else b = B.deep;
-    biome[i] = b;
-  }
-  return {biome, cold};
 }
 function renderMap(w){
   const N = w.N, PW = N*TS, c = document.createElement('canvas'); c.width = PW; c.height = PW;
@@ -410,6 +415,8 @@ function renderMap(w){
         if(L===3 && h%7===0) col = TREE;
         if(coast && L>1 && h%3===0) col = SAND;
         if(w.cold[i]) col = L===4 || h%6===0 ? SNOW2 : (L===3 && h%7===0) ? [60,92,84] : SNOW; // snow on frozen islands
+        else if(bi===B.volcanic) col = L===1 ? (h%4 ? [92,82,84] : [70,62,66]) : h%23===0 ? [230,96,46] : (L===4 || h%3===0) ? [58,52,58] : [76,70,74]; // ash and basalt
+        else if(bi===B.mangrove && L>1) col = h%3===0 ? [30,64,38] : h%3===1 ? TREE : [58,104,58]; // dense mangrove canopy
         r=col[0]; gg=col[1]; bb=col[2];
       } else if(b===99){ const dark = h%17===0; r = dark?8:2; gg = dark?10:4; bb = dark?18:9; }
       else {
