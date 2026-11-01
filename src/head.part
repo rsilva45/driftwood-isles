@@ -137,6 +137,10 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+body.touch[data-mode=travel]{touch-action:none}
+#joy{position:fixed;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:2px solid rgba(239,227,200,.35);background:rgba(15,34,54,.25);z-index:40;pointer-events:none;opacity:0;transition:opacity .15s}
+#joy.on{opacity:1}#joy[hidden]{display:none}
+#joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;background:rgba(239,227,200,.45);border:2px solid rgba(239,227,200,.6);transform:translate(-50%,-50%)}
 .restbox{max-width:420px;margin:0 auto;text-align:center;display:flex;flex-direction:column;gap:14px}
 .restbox p{font-size:13px;margin:0;line-height:1.5}
 .restpick{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px;border:2px solid var(--line);background:rgba(15,34,54,.6)}
@@ -375,6 +379,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
 </dialog>
 
 <!-- Shop -->
+<div id="joy" hidden><i></i></div>
 <div id="sleepFade" aria-hidden="true"><span></span></div>
 <dialog id="shopDlg" aria-labelledby="shopTitle">
   <div class="dh"><h2 id="shopTitle">Harbor shop</h2><div class="flexw"><span class="price" id="shopCoins"></span><button class="x" data-close aria-label="Close">✕</button></div></div>

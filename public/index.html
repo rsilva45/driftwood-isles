@@ -137,6 +137,10 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+body.touch[data-mode=travel]{touch-action:none}
+#joy{position:fixed;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:2px solid rgba(239,227,200,.35);background:rgba(15,34,54,.25);z-index:40;pointer-events:none;opacity:0;transition:opacity .15s}
+#joy.on{opacity:1}#joy[hidden]{display:none}
+#joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;background:rgba(239,227,200,.45);border:2px solid rgba(239,227,200,.6);transform:translate(-50%,-50%)}
 .restbox{max-width:420px;margin:0 auto;text-align:center;display:flex;flex-direction:column;gap:14px}
 .restbox p{font-size:13px;margin:0;line-height:1.5}
 .restpick{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px;border:2px solid var(--line);background:rgba(15,34,54,.6)}
@@ -375,6 +379,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
 </dialog>
 
 <!-- Shop -->
+<div id="joy" hidden><i></i></div>
 <div id="sleepFade" aria-hidden="true"><span></span></div>
 <dialog id="shopDlg" aria-labelledby="shopTitle">
   <div class="dh"><h2 id="shopTitle">Harbor shop</h2><div class="flexw"><span class="price" id="shopCoins"></span><button class="x" data-close aria-label="Close">✕</button></div></div>
@@ -549,6 +554,13 @@ const NETS = [
   {name:'Seine Net', depth:32, cap:5, speed:1.45, w:32, h:18, price:900,  desc:'Wider, deeper and quicker, with more floats along the top line.'},
   {name:'Trawl Net', depth:45, cap:8, speed:2,    w:40, h:22, price:2400, desc:'A heavy net that sinks fast and holds a crowd.'},
 ];
+// Boat light: lights the water under the boat while fishing, and a beam ahead of the bow at night while sailing
+const LIGHTS = [
+  {name:'Deck Lamp',    reach:30,  beam:34, price:400,  desc:'An oil lamp on the bow. Lights the first stretch of water.'},
+  {name:'Spotlight',    reach:60,  beam:44, price:1200, desc:'A sealed spotlight that cuts down to 60 ft.'},
+  {name:'Searchlight',  reach:110, beam:56, price:2800, desc:'A swiveling searchlight. Fish at 110 ft show up clearly.'},
+  {name:'Abyss Beacon', reach:180, beam:70, price:6000, desc:'A beam so strong it lights fish 180 ft down.'},
+];
 const NET_ESCAPE = [0, 0, .15, .4, .7, .9]; // chance a fish of each rarity tears free
 const DYN = {
   stick: 220, sink: 9, // coins per stick, sinking speed in ft per second
@@ -605,7 +617,7 @@ const dynMaxDepth = () => Math.min(dynBoomDepth(), LAKE_FT - 1);
 function aimDepth(){ return T.hover ? clamp((T.hover.y + camY - SURF)/FT, .5, dynMaxDepth()) : Math.min(10, dynMaxDepth()); }
 
 /* ================== Save ================== */
-function defaults(){ return {coins:25, inv:[], rod:0, bait:0, boat:0, owned:{rod:[0],bait:[0],boat:[0]}, custom:[], caught:{}, sound:true, shake:!REDUCED, world:null, net:-1, dyn:{count:0, fuse:0, radius:0, bag:0}, weapons:defaultWeapons(), clock:8*60}; }
+function defaults(){ return {coins:25, inv:[], rod:0, bait:0, boat:0, owned:{rod:[0],bait:[0],boat:[0]}, custom:[], caught:{}, sound:true, shake:!REDUCED, world:null, net:-1, dyn:{count:0, fuse:0, radius:0, bag:0}, weapons:defaultWeapons(), clock:8*60, light:-1}; }
 function defaultWeapons(){ return {revolver:{lvl:-1, ammo:0, mag:0}, shotgun:{lvl:-1, ammo:0, mag:0}, sniper:{lvl:-1, ammo:0, mag:0}, lightning:{lvl:-1, ammo:0, mag:0, ammo2:0, alt:false}}; }
 function load(){
   try{
@@ -613,7 +625,7 @@ function load(){
     if(!raw) return defaults();
     const d = Object.assign(defaults(), JSON.parse(raw));
     d.owned = Object.assign({rod:[0],bait:[0],boat:[0]}, d.owned || {});
-    d.dyn = Object.assign({count:0, fuse:0, radius:0, bag:0}, d.dyn || {}); if(typeof d.net !== 'number') d.net = -1;
+    d.dyn = Object.assign({count:0, fuse:0, radius:0, bag:0}, d.dyn || {}); d.light = clamp(Number.isFinite(d.light) ? d.light|0 : -1, -1, LIGHTS.length-1); if(typeof d.net !== 'number') d.net = -1;
     // older saves kept the revolver in gun/ammo/cyl
     const wd = defaultWeapons(); d.weapons = Object.assign(wd, d.weapons || {});
     if(typeof d.gun === 'number' && d.gun >= 0 && d.weapons.revolver.lvl < 0) d.weapons.revolver = {lvl:d.gun, ammo:d.ammo|0, mag:d.cyl|0};
@@ -1002,6 +1014,12 @@ function makeIcon(draw){
   return c.toDataURL();
 }
 const ICONS = {
+  light: makeIcon(P => { // a ship's searchlight with a beam
+    for(let y=5;y<=11;y++) for(let x=3;x<=8;x++) P(x, y, x===3 ? '#5a6570' : y===5 ? '#cfd6db' : '#8a96a0');
+    for(let y=6;y<=10;y++){ P(9, y, '#fff4c0'); P(10, y, '#ffe48a'); }
+    for(let i=0;i<4;i++){ P(11+i, 7-i, '#fff4c0', false); P(11+i, 8, '#ffe48a', false); P(11+i, 9+i, '#fff4c0', false); }
+    P(5,12,'#5a6570'); P(6,12,'#5a6570'); for(let x=3;x<=8;x++) P(x,13,'#3d4650');
+  }),
   rod: makeIcon(P => {
     for(let i=0;i<10;i++){ const x=3+i, y=12-i; P(x, y, i<4 ? '#7a5530' : '#a8703f'); if(i<3) P(x+1, y, '#7a5530'); }
     for(let dx=0;dx<3;dx++) for(let dy=0;dy<3;dy++) P(2+dx, 10+dy, '#9aa6b0'); P(3,11,'#5a6570');
@@ -1066,7 +1084,7 @@ const TOP_BOATS = BOATS.map((b, ti) => {
 });
 
 /* ================== Canvas setup ================== */
-const cvs = $('game'), ctx = cvs.getContext('2d');
+const cvs = $('game'); let ctx = cvs.getContext('2d');   // let: the lighting pass briefly draws through an offscreen context
 ctx.imageSmoothingEnabled = false;
 const mini = $('mini'), mctx = mini.getContext('2d');
 const px = (x,y,w,h,c) => { ctx.fillStyle=c; ctx.fillRect(Math.round(x),Math.round(y),w,h); };
@@ -1434,11 +1452,36 @@ function press(){
   }
 }
 function release(){ holding = false; holdFromWaiting = false; if(G.state==='charging'){ if(G.chargeTool==='net') castNet(); else castLine(); } }
+/* Ghost joystick (touch screens, sailing only): put a thumb down anywhere that isn't a button
+   and a stick appears under it. Drag to steer; the further you drag, the faster you sail. */
+const IS_TOUCH_EARLY = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+const joyEl = $('joy'), joyKnob = joyEl.querySelector('i'), JOY_R = 54;
+function joyStart(e){
+  if(e.pointerType!=='touch' || G.mode!=='travel' || G.trans || anyDialog() || T.joy) return;
+  if(e.target.closest('button, a, input, select, label, dialog, .chip, #mini, .pad, #tools, #actions')) return;
+  e.preventDefault(); ac();
+  T.joy = {id:e.pointerId, x0:e.clientX, y0:e.clientY, dx:0, dy:0};
+  joyEl.style.left = e.clientX + 'px'; joyEl.style.top = e.clientY + 'px'; joyKnob.style.transform = 'translate(-50%,-50%)';
+  joyEl.hidden = false; requestAnimationFrame(() => joyEl.classList.add('on'));
+}
+function joyMove(e){
+  const J = T.joy; if(!J || e.pointerId !== J.id) return;
+  let dx = e.clientX - J.x0, dy = e.clientY - J.y0; const d = Math.hypot(dx, dy);
+  if(d > JOY_R){ // drag past the edge and the stick follows your thumb
+    const k = (d - JOY_R)/d; J.x0 += dx*k; J.y0 += dy*k; dx -= dx*k; dy -= dy*k;
+    joyEl.style.left = J.x0 + 'px'; joyEl.style.top = J.y0 + 'px';
+  }
+  J.dx = dx; J.dy = dy; joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+}
+function joyEnd(e){ const J = T.joy; if(!J || (e && e.pointerId !== J.id)) return; T.joy = null; joyEl.classList.remove('on'); setTimeout(() => { if(!T.joy) joyEl.hidden = true; }, 160); }
+window.addEventListener('pointerdown', joyStart, {passive:false});
+window.addEventListener('pointermove', joyMove);
+window.addEventListener('pointerup', joyEnd); window.addEventListener('pointercancel', joyEnd);
 function canvasPoint(e){ const r = cvs.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*W, y:(e.clientY-r.top)/r.height*H}; }
 cvs.addEventListener('pointerdown', e => {
   if(e.button!==0 && e.pointerType==='mouse') return;
   e.preventDefault(); cvs.setPointerCapture?.(e.pointerId); ac();
-  if(G.mode==='travel'){ if(!anyDialog() && !G.trans) T.ptr = canvasPoint(e); return; }
+  if(G.mode==='travel'){ if(e.pointerType==='touch' && IS_TOUCH_EARLY) return; if(!anyDialog() && !G.trans) T.ptr = canvasPoint(e); return; }
   T.hover = canvasPoint(e);
   press();
 });
@@ -1492,7 +1535,7 @@ window.addEventListener('keydown', e => {
   else if(k==='m'){ S.sound=!S.sound; save(); $('optSound').checked=S.sound; toast(S.sound?'Sound on':'Sound off'); }
 });
 window.addEventListener('keyup', e => { if(KEYMAP[e.code]) T.keys[KEYMAP[e.code]] = false; if(e.code==='Space') release(); });
-window.addEventListener('blur', ()=>{ holding=false; T.keys={}; T.ptr=null; });
+window.addEventListener('blur', ()=>{ holding=false; T.keys={}; T.ptr=null; joyEnd(); });
 addEventListener('visibilitychange', ()=>{ if(document.hidden) saveWorld(); });
 addEventListener('beforeunload', saveWorld);
 
@@ -1545,10 +1588,17 @@ function updateTravel(dt){
     const want = Math.atan2(wy - T.y, wx - T.x); let d = want - T.ang; d = Math.atan2(Math.sin(d), Math.cos(d));
     turn = clamp(d*3, -1, 1); thr = Math.hypot(wx-T.x, wy-T.y) > 14 ? 1 : 0;
   }
+  let cap = 1;
+  if(T.joy && !G.trans){
+    const J = T.joy, m = Math.hypot(J.dx, J.dy)/JOY_R;
+    if(m > .18){ const want = Math.atan2(J.dy, J.dx); let d = want - T.ang; d = Math.atan2(Math.sin(d), Math.cos(d)); turn = clamp(d*3, -1, 1); thr = Math.abs(d) > 2.4 && T.spd < 4 ? 0 : 1; cap = clamp((m - .18)/.7, .3, 1); }
+    else { turn = 0; thr = 0; }
+  }
+  if(G.mode!=='travel' && T.joy) joyEnd();
   if(G.trans || anyDialog()){ turn = 0; thr = 0; }
   T.ang += turn*2.6*dt*(.45 + .55*Math.min(1, Math.abs(T.spd)/b.speed + .25));
   if(thr>0) T.spd += 38*dt; else if(thr<0) T.spd -= 55*dt; else T.spd *= Math.pow(.3, dt);
-  T.spd = clamp(T.spd, -b.speed*.4, b.speed); if(!thr && Math.abs(T.spd) < .4) T.spd = 0;
+  T.spd = clamp(T.spd, -b.speed*.4, b.speed); if(T.spd > b.speed*cap) T.spd = Math.max(b.speed*cap, T.spd - 60*dt); if(!thr && Math.abs(T.spd) < .4) T.spd = 0;
   const ca = Math.cos(T.ang), sa = Math.sin(T.ang);
   const nx = T.x + ca*T.spd*dt, ny = T.y + sa*T.spd*dt, bow = Math.sign(T.spd||1)*5;
   const ok = (x,y) => isWaterPx(x,y) && isWaterPx(x+ca*bow, y+sa*bow);
@@ -1609,6 +1659,7 @@ function renderTravel(zoom){
   drawTopBoat();
   // Time of day: tint the map, then let the lighthouse and the boat's lantern shine
   applyDayTint();
+  drawTravelBeam(zoom, cam, sx, sy, sw, sh);
   const n = nightK();
   if(n > 0){
     const h = w.harbor, lx = Math.round(h.wx-4)+.5, ly = Math.round(h.wy-7)+.5;
@@ -2567,6 +2618,7 @@ function equipmentRow(){
   for(const id of WEAPON_IDS){ const st = WS(id); if(st.lvl < 0) continue;
     bits.push(`<span class="eqi"><img class="wide" src="${ICONS[id]}" alt="">${esc(wTier(id).name)}</span><span class="eqi"><img src="${ICONS['ammo_'+id]}" alt="">${WEAPONS[id].bolt ? `${st.ammo} cells` : `${st.mag} loaded, ${st.ammo} spare`}</span>${WEAPONS[id].bolt ? `<span class="eqi"><img src="${ICONS['ammo2_'+id]}" alt="">${st.ammo2} delayed</span>` : ''}`); }
   if(S.net>=0) bits.push(`<span class="eqi"><img src="${ICONS.net}" alt="">${esc(NETS[S.net].name)}</span>`);
+  if(S.light>=0) bits.push(`<span class="eqi"><img src="${ICONS.light}" alt="">${esc(LIGHTS[S.light].name)}</span>`);
   if(S.dyn.count>0) bits.push(`<span class="eqi"><img src="${ICONS.dyn}" alt="">${S.dyn.count} dynamite</span>`);
   return bits.length ? `<div class="equip">${bits.join('')}</div>` : '';
 }
@@ -2998,6 +3050,7 @@ function drawBoatAndFisher(){
   px(left+2, top-11, 1, 11, '#4a3420'); px(left, top-11, 3, 1, '#4a3420');
   px(left-1, top-10, 3, 3, '#7a5a2a'); px(left, top-9, 1, 1, '#ffd27a');
   r.lantern = {x:left, y:top-9};
+  if(S.light >= 0){ const bx = left + L - 8; px(bx, top-4, 4, 3, '#5a6570'); px(bx, top-4, 4, 1, '#8a96a0'); px(bx+4, top-4, 1, 3, '#ffe48a'); px(bx+1, top-1, 2, 1, '#3d4650'); }
   if(S.boat===1){ px(left-5, top-4, 5, 7, '#2b2f3a'); px(left-6, top-6, 7, 3, '#d84f3a'); px(left-3, top+3, 1, 6, '#55606a'); }
   S.inv.forEach((it, i) => { if(G.pending.has(it.uid)) return; const p = pileSlot(i, r), sp = byId[it.sid]; drawSprite(sp ? sp.pile : GENERIC_PILE, p.x, p.y, hash(it.uid)%2 ? 1 : -1, 0, 0); });
   if(G.state==='landed' && G.landed){ const p = G.landed.slot; drawSprite(G.landed.sp.pile, p.x, p.y + (Math.floor(time*6)%2 ? -1 : 0), 1, time*6, 0); }
@@ -3039,6 +3092,62 @@ function drawLine(){
   px(lx, ly, 1, 3, '#cfd6db'); px(lx+1, ly+2, 1, 1, '#cfd6db'); px(lx+2, ly+1, 1, 1, '#cfd6db');
   if(S.bait===0){ px(lx-1, ly+1, 2, 1, bc); px(lx-2, ly+2, 1, 1, bc); }
   else { px(lx-1, ly-1, 2, 3, bc); if(Math.floor(time*4)%2) px(lx-1, ly-1, 1, 1, '#ffffff'); }
+}
+/* ================== Light in the dark ==================
+   The day tint and deep water darken everything. Lights (a glowing lure, lanternfish, the boat light)
+   redraw the fish inside their glow at full color: fish are drawn again onto an offscreen layer,
+   cut to the shape of the lights, and laid over the darkened scene. */
+const [litC, litG] = mk(W, H), [maskC, maskG] = mk(W, H);
+litG.imageSmoothingEnabled = false;
+function boatBeam(){
+  if(S.light < 0 || !G.rig || !G.rig.top) return null;
+  const r = G.rig, reach = Math.min(LIGHTS[S.light].reach*FT, (ABYSS ? 9999 : BED_Y - SURF)), bx = r.left + boat().len - 6, by = SURF + 1;
+  const ey = by + reach, cx = bx + reach*.28, half = 12 + reach*.32;
+  return {bx, by, ey, cx, half, reach};
+}
+function drawLights(sx, syc){
+  const lights = [];
+  const glowBait = isWet() && S.bait >= 2 && G.state!=='landing';
+  if(glowBait) lights.push({x:G.lure.x, y:G.lure.y, r:S.bait===3 ? 44 : 36, col:S.bait===3 ? '255,214,110' : '127,240,224'});
+  for(const f of fishes){ const ln = f.def.sprite.lantern; if(ln && !f.rot && onScreen(f.y, 20)){ const flip = f.dir<0 ? -1 : 1; lights.push({x:f.x + ln.x*flip, y:f.y + ln.y, r:18, col:'127,240,224', small:true}); } }
+  const beam = boatBeam();
+  if(!lights.length && !beam) return;
+  // 1. the shape of all the light, in white
+  maskG.setTransform(1,0,0,1,0,0); maskG.clearRect(0,0,W,H); maskG.setTransform(1,0,0,1,sx,syc); maskG.globalCompositeOperation = 'lighter';
+  for(const L of lights){ const g = maskG.createRadialGradient(L.x,L.y,0,L.x,L.y,L.r); g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.55,'rgba(255,255,255,.75)'); g.addColorStop(1,'rgba(255,255,255,0)'); maskG.fillStyle = g; maskG.fillRect(L.x-L.r, L.y-L.r, L.r*2, L.r*2); }
+  if(beam){ const g = maskG.createLinearGradient(0, beam.by, 0, beam.ey); g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.6,'rgba(255,255,255,.7)'); g.addColorStop(1,'rgba(255,255,255,0)');
+    maskG.fillStyle = g; maskG.beginPath(); maskG.moveTo(beam.bx-3, beam.by); maskG.lineTo(beam.bx+3, beam.by); maskG.lineTo(beam.cx+beam.half, beam.ey); maskG.lineTo(beam.cx-beam.half, beam.ey); maskG.closePath(); maskG.fill(); }
+  // 2. the fish (and the monster) again, at full color
+  litG.setTransform(1,0,0,1,0,0); litG.globalCompositeOperation = 'source-over'; litG.clearRect(0,0,W,H); litG.setTransform(1,0,0,1,sx,syc);
+  const main = ctx; ctx = litG;
+  try{ for(const f of fishes) drawFish(f); drawSaltwight(); if(G.state==='landing' && G.landed){ const a=G.landAnim; drawSprite(G.landed.sp.sprite, a.x, a.y, 1, time*8, a.rot); } }
+  finally{ ctx = main; }
+  litG.setTransform(1,0,0,1,0,0); litG.globalCompositeOperation = 'destination-in'; litG.drawImage(maskC, 0, 0); litG.globalCompositeOperation = 'source-over';
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(litC, 0, 0); ctx.restore();
+  // 3. the light itself, glowing in the water; stronger the darker it is
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for(const L of lights){ const dk = clamp(Math.max(nightK(), (L.y - SURF)/(FT*220)), .25, 1), pulse = L.small ? .8 + .2*Math.sin(time*5) : .85 + .15*Math.sin(time*3.2);
+    const g = ctx.createRadialGradient(L.x,L.y,0,L.x,L.y,L.r); g.addColorStop(0,`rgba(${L.col},${.42*dk*pulse})`); g.addColorStop(.4,`rgba(${L.col},${.14*dk*pulse})`); g.addColorStop(1,`rgba(${L.col},0)`); ctx.fillStyle = g; ctx.fillRect(L.x-L.r, L.y-L.r, L.r*2, L.r*2); }
+  if(beam){ const dk = clamp(Math.max(nightK(), LAKE_FT/260), .15, 1), g = ctx.createLinearGradient(0, beam.by, 0, beam.ey); g.addColorStop(0,`rgba(255,240,200,${.2*dk})`); g.addColorStop(1,'rgba(255,240,200,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(beam.bx-2, beam.by); ctx.lineTo(beam.bx+2, beam.by); ctx.lineTo(beam.cx+beam.half, beam.ey); ctx.lineTo(beam.cx-beam.half, beam.ey); ctx.closePath(); ctx.fill();
+    // a few drifting motes catch the beam
+    for(let i=0;i<14;i++){ const t = ((time*.05 + i*.071) % 1), y = beam.by + t*(beam.ey-beam.by), half = 2 + (beam.half)*t, x = beam.bx + (beam.cx-beam.bx)*t + Math.sin(i*7.3 + time*.6)*half*.8; if(!onScreen(y,2)) continue; ctx.fillStyle = `rgba(255,246,220,${.45*(1-t)*dk})`; ctx.fillRect(Math.round(x), Math.round(y), 1, 1); } }
+  ctx.restore();
+}
+// Sailing at night: a cone of light ahead of the bow shows the map at full color
+function drawTravelBeam(zoom, cam, sx, sy, sw, sh){
+  const n = nightK(); if(S.light < 0 || n <= .05 || !WORLD) return;
+  const len = LIGHTS[S.light].beam, a = T.ang, ax = T.x + Math.cos(a)*3, ay = T.y + Math.sin(a)*3, sp = .42;
+  const tr = [zoom,0,0,zoom,-cam.x*zoom,-cam.y*zoom];
+  const wedge = g => { g.beginPath(); g.moveTo(ax, ay); for(let k=0;k<=12;k++){ const aa = a - sp + 2*sp*k/12; g.lineTo(ax + Math.cos(aa)*len, ay + Math.sin(aa)*len); } g.closePath(); };
+  maskG.setTransform(1,0,0,1,0,0); maskG.globalCompositeOperation = 'source-over'; maskG.clearRect(0,0,W,H); maskG.setTransform(...tr);
+  const mg = maskG.createRadialGradient(ax,ay,0,ax,ay,len); mg.addColorStop(0,'rgba(255,255,255,1)'); mg.addColorStop(.7,'rgba(255,255,255,.75)'); mg.addColorStop(1,'rgba(255,255,255,0)'); maskG.fillStyle = mg; wedge(maskG); maskG.fill();
+  litG.setTransform(1,0,0,1,0,0); litG.globalCompositeOperation = 'source-over'; litG.clearRect(0,0,W,H); litG.setTransform(...tr);
+  litG.drawImage(WORLD.mapC, sx, sy, sw, sh, sx, sy, sw, sh);
+  { const main = ctx; ctx = litG; try{ drawTopBoat(); } finally{ ctx = main; } }
+  litG.setTransform(1,0,0,1,0,0); litG.globalCompositeOperation = 'destination-in'; litG.drawImage(maskC, 0, 0); litG.globalCompositeOperation = 'source-over';
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = .9*n; ctx.drawImage(litC, 0, 0); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(ax,ay,0,ax,ay,len); g.addColorStop(0,`rgba(255,240,200,${.28*n})`); g.addColorStop(1,'rgba(255,240,200,0)'); ctx.fillStyle = g; wedge(ctx); ctx.fill(); ctx.restore();
 }
 function drawCharge(){
   const r=G.rig, x=r.fx-10, y=r.top-26;
@@ -3115,6 +3224,7 @@ function renderFishing(){
   }
   // Time of day: tint the whole scene, then add what glows in the dark
   applyDayTint();
+  drawLights(sx, sy-cy);
   if(cy < SURF+4) drawNightSky();
   drawSceneryGlow();
   drawLightning();
@@ -3153,7 +3263,7 @@ if(IS_TOUCH) document.body.classList.add('touch');
 const TOUCH_TEXT = [
   ['Click to fire lightning', 'Tap to fire lightning'], [' T switches to delayed cells.', ''], ['Click where the charge should burst', 'Tap where the charge should burst'],
   [' T switches cells. Scroll to look deeper.', ' Use the arrows to look deeper.'], ['Press T to switch back to power cells.', 'Tap Normal cells to switch back.'],
-  ['Sail with W A S D or the arrow keys, or hold the mouse where you want to go.', 'Touch and hold where you want to sail.'],
+  ['Sail with W A S D or the arrow keys, or hold the mouse where you want to go.', 'Put your thumb down anywhere and drag to sail.'],
   ['Hold click or Space to cast. Press 1, 2 or 3 to switch tools, Esc to sail on.', 'Press and hold to cast, then let go. Switch tools in the corner.'],
   ['Press Esc to sail back to the harbor.', 'Tap Return to sail and head back to the harbor.'],
   ['Hold click or Space to throw the', 'Press and hold to throw the'], [', then release.', ', then let go.'],
@@ -3403,6 +3513,13 @@ function tackleShop(){
     ${nx ? `<p style="color:var(--bone)">${cur>=0 ? 'Upgrade to' : 'Buy the'} ${nx.name}: ${nx.depth} ft, ${nx.cap} fish, ${nx.speed}x speed.</p>
       <div class="row"><span class="price">${fmt(nx.price)} coins</span><button class="btn sm" data-tk="net" ${S.coins<nx.price?'disabled':''}>${cur>=0?'Upgrade':'Buy'}</button></div>`
     : `<div class="row"><span style="color:var(--bone-dim);font-size:12px">Fully upgraded</span></div>`}</div>`);
+  // Boat light
+  { const lv = S.light, nl = LIGHTS[lv+1];
+    cards.push(`<div class="card ${lv>=0?'eq':''}"><div class="row" style="margin:0"><img class="cardicon" src="${ICONS.light}" alt="">${pips(lv+1, LIGHTS.length)}</div>
+      <h3>${lv>=0 ? LIGHTS[lv].name : 'Boat light'}</h3><p>${lv>=0 ? esc(LIGHTS[lv].desc) : 'Lights up the water under your boat so you can see fish in the dark, and throws a beam ahead of the bow when you sail at night.'}</p>
+      ${lv>=0 ? `<ul class="stats"><li>Lights the water to <span>${LIGHTS[lv].reach} ft</span></li></ul>` : ''}
+      ${nl ? `<p style="color:var(--bone)">${lv>=0 ? 'Upgrade to' : 'Buy the'} ${nl.name}: lights to ${nl.reach} ft.</p><div class="row"><span class="price">${fmt(nl.price)} coins</span><button class="btn sm" data-tk="light" ${S.coins<nl.price?'disabled':''}>${lv>=0?'Upgrade':'Buy'}</button></div>`
+        : `<div class="row"><span style="color:var(--bone-dim);font-size:12px">Fully upgraded</span></div>`}</div>`); }
   // Dynamite sticks
   const cap = DYN.bag[S.dyn.bag].v, room = cap - S.dyn.count, fillCost = room*DYN.stick;
   cards.push(`<div class="card"><div class="row" style="margin:0"><img class="cardicon" src="${ICONS.dyn}" alt=""><span class="price">${fmt(DYN.stick)} coins each</span></div>
@@ -3426,7 +3543,8 @@ function tackleShop(){
 }
 function buyTackle(k){
   const pay = c => { if(S.coins < c) return false; S.coins -= c; return true; };
-  if(k==='net'){ const nx = NETS[S.net+1]; if(!nx || !pay(nx.price)) return; S.net++; toast(`You now have the ${nx.name}. Press 2 while fishing to use it.`); }
+  if(k==='light'){ const nl = LIGHTS[S.light+1]; if(!nl || !pay(nl.price)) return; S.light++; toast(S.light ? `Upgraded to the ${nl.name}.` : `You fitted a ${nl.name}. It lights the water when you fish, and the way ahead when you sail at night.`); }
+  else if(k==='net'){ const nx = NETS[S.net+1]; if(!nx || !pay(nx.price)) return; S.net++; toast(`You now have the ${nx.name}. Press 2 while fishing to use it.`); }
   else if(k==='stick1' || k==='stickfill'){
     const cap = DYN.bag[S.dyn.bag].v, n = k==='stick1' ? 1 : cap - S.dyn.count; if(n<=0 || !pay(n*DYN.stick)) return;
     S.dyn.count += n; toast(`Bought ${n} stick${n>1?'s':''} of dynamite. Press 3 while fishing to throw.`);
@@ -3456,7 +3574,7 @@ $('optShake').onchange=e=>{ S.shake=e.target.checked; save(); };
 $('admCoins').onclick=()=>{ S.coins+=1000; save(); sfx('coin'); toast('Added 1,000 coins.'); };
 $('admSpawn').onclick=()=>{ if(G.mode!=='fish'){ toast('Start fishing first, then spawn a fish.'); return; } const f=spawnFish(null,true); toast(`Released a ${f.def.name} at ${f.depth.toFixed(0)} ft.`); };
 $('admSummon').onclick=()=>{ if(G.mode!=='fish'){ toast('Start fishing first, then summon it.'); return; } if(M){ toast('The Saltwight is already here.'); return; } document.getElementById('adminDlg').close(); spawnSaltwight(); M.raidT = 4; };
-$('admUnlock').onclick=()=>{ S.owned={rod:RODS.map((_,i)=>i), bait:BAITS.map((_,i)=>i), boat:BOATS.map((_,i)=>i)}; S.net=NETS.length-1; S.dyn={count:DYN.bag[3].v, fuse:3, radius:3, bag:3}; for(const id of WEAPON_IDS){ const w = WEAPONS[id]; S.weapons[id] = Object.assign(S.weapons[id] || {}, {lvl:w.tiers.length-1, ammo:w.ammoMax, mag:w.tiers[w.tiers.length-1].shots || w.mag}); if(w.ammo2Max) S.weapons[id].ammo2 = w.ammo2Max; } save(); toast('All gear unlocked. Equip it at the harbor shop.'); };
+$('admUnlock').onclick=()=>{ S.owned={rod:RODS.map((_,i)=>i), bait:BAITS.map((_,i)=>i), boat:BOATS.map((_,i)=>i)}; S.net=NETS.length-1; S.light=LIGHTS.length-1; S.dyn={count:DYN.bag[3].v, fuse:3, radius:3, bag:3}; for(const id of WEAPON_IDS){ const w = WEAPONS[id]; S.weapons[id] = Object.assign(S.weapons[id] || {}, {lvl:w.tiers.length-1, ammo:w.ammoMax, mag:w.tiers[w.tiers.length-1].shots || w.mag}); if(w.ammo2Max) S.weapons[id].ammo2 = w.ammo2Max; } save(); toast('All gear unlocked. Equip it at the harbor shop.'); };
 $('admReveal').onclick=()=>{ if(!WORLD) return; WORLD.fog.fill(255); for(let i=0;i<WORLD.fog.length;i++) WORLD.fogImg.data[i*4+3]=0; WORLD.spots.forEach(s=>s.found=true); WORLD.fogDirty=true; saveWorld(); toast('Whole chart revealed.'); };
 $('admNewMap').onclick=e=>{ const b=e.currentTarget;
   if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Click again for a new map'; setTimeout(()=>{ b.dataset.armed=''; b.textContent='Chart a new map'; }, 3500); return; }
