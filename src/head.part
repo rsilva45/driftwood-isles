@@ -137,6 +137,11 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn[hidden]{display:none}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
+.ibtn[hidden]{display:none}
+#poppedOv{position:fixed;inset:0;z-index:10000;background:#081222;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+#poppedOv[hidden]{display:none}
+#poppedOv>div{display:flex;flex-direction:column;gap:12px;align-items:center;max-width:420px}
+#poppedOv strong{font-size:18px;color:var(--bone)}#poppedOv span{font-size:13px;color:var(--bone-dim);line-height:1.5}
 .invstat{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.invstat .chip{font-size:14px}
 body.touch[data-mode=travel],body.touch[data-mode=land]{touch-action:none}
 body[data-mode="land"] #miniWrap, body[data-mode="land"] #gauge, body[data-mode="land"] #touchPad{display:none}
@@ -309,6 +314,9 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <button class="ibtn" id="btnInv" aria-label="Open inventory (I)" title="Inventory (I): coins, time, hold">
       <svg viewBox="0 0 11 11"><rect x="3" y="1" width="5" height="1" fill="#efe3c8"/><rect x="2" y="2" width="1" height="2" fill="#efe3c8"/><rect x="8" y="2" width="1" height="2" fill="#efe3c8"/><rect x="1" y="4" width="9" height="6" fill="#c98a4b"/><rect x="1" y="4" width="9" height="1" fill="#e8b06e"/><rect x="4" y="6" width="3" height="2" fill="#6b4422"/></svg><kbd>I</kbd></button>
     
+    <button class="ibtn" id="btnPop" hidden aria-label="Pop out: play in a floating window" title="Pop out: play in a floating window that stays on top">
+      <svg viewBox="0 0 11 11" style="shape-rendering:crispEdges"><rect x="1" y="2" width="7" height="1" fill="#efe3c8"/><rect x="1" y="2" width="1" height="7" fill="#efe3c8"/><rect x="1" y="8" width="7" height="1" fill="#efe3c8"/><rect x="7" y="6" width="1" height="3" fill="#efe3c8"/><rect x="5" y="1" width="5" height="1" fill="#ffd25e"/><rect x="9" y="1" width="1" height="5" fill="#ffd25e"/><rect x="8" y="2" width="1" height="1" fill="#ffd25e"/><rect x="7" y="3" width="1" height="1" fill="#ffd25e"/><rect x="6" y="4" width="1" height="1" fill="#ffd25e"/></svg>
+    </button>
     <button class="ibtn" id="btnAdmin" aria-label="Open settings and admin (G)" title="Settings and admin (G)">
       <svg viewBox="0 0 11 11"><rect x="4" y="0" width="3" height="11" fill="#b3a98f"/><rect x="0" y="4" width="11" height="3" fill="#b3a98f"/><rect x="1" y="1" width="2" height="2" fill="#b3a98f"/><rect x="8" y="1" width="2" height="2" fill="#b3a98f"/><rect x="1" y="8" width="2" height="2" fill="#b3a98f"/><rect x="8" y="8" width="2" height="2" fill="#b3a98f"/><rect x="2" y="2" width="7" height="7" fill="#efe3c8"/><rect x="4" y="4" width="3" height="3" fill="#0f2236"/></svg><kbd>G</kbd></button>
     <div id="miniWrap"><canvas id="mini" width="132" height="132" aria-label="Mini-map"></canvas><div class="minilbl" id="miniLbl">Chart</div></div>
@@ -387,6 +395,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
 
 <!-- Shop -->
 <div id="joy" hidden><i></i></div>
+<div id="poppedOv" hidden><div><strong>Driftwood Isles is playing in the pop-out window.</strong><span>Drag it to any screen. Close it, or use the button below, to play here again.</span><button class="btn" id="popBack">Bring the game back here</button></div></div>
 <div id="sleepFade" aria-hidden="true"><span></span></div>
 <dialog id="shopDlg" aria-labelledby="shopTitle">
   <div class="dh"><h2 id="shopTitle">Harbor shop</h2><div class="flexw"><span class="price" id="shopCoins"></span><button class="x" data-close aria-label="Close">✕</button></div></div>

@@ -10,6 +10,11 @@
 const W = 320, H = 180, SURF = 60, FT = 4, TS = 4;
 let LAKE_FT = 30, ABYSS = false, ZONE = 0, BIOME = 4, HOT = false, BED_Y = SURF + 120, WORLD_H = BED_Y + 24, CAM_MAX = 0;
 const SAVE_KEY = 'driftwood-lake-save-v1';
+// Pop-out: the game can run in a floating always-on-top window (Document Picture-in-Picture).
+// The floating window loads the game in a frame with ?popout=1; this tab then pauses and stops
+// saving so the two copies never overwrite each other, and reloads when the window closes.
+const POPOUT = new URLSearchParams(location.search).has('popout');
+let POPPED = false, pipWin = null;
 const RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Super Rare'];
 const ZONES = ['Shallows', 'Open water', 'Deep water', 'Deep sea', 'Abyss'];
 // Biomes: regions of the map with their own water color, scenery and fish.
@@ -197,6 +202,7 @@ function load(){
   }catch(e){ return defaults(); }
 }
 function save(){
+  if(POPPED) return true;   // the pop-out window owns the save while it's open
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); lastSavedAt = Date.now(); queueFileSync(); return true; }
   catch(e){ toast("Couldn't save: browser storage is full. Delete a custom fish or use smaller images."); return false; }
 }
@@ -1116,7 +1122,7 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if(KEYMAP[e.code]) T.keys[KEYMAP[e.code]] = false; if(e.code==='Space' || e.code==='KeyW' || e.code==='ArrowUp') HERO.jumpHeld = false; if(e.code==='Space') release(); });
 window.addEventListener('blur', ()=>{ holding=false; T.keys={}; T.ptr=null; joyEnd(); });
 addEventListener('visibilitychange', ()=>{ if(document.hidden) saveWorld(); });
-addEventListener('beforeunload', saveWorld);
+addEventListener('beforeunload', () => { if(!POPPED) saveWorld(); });
 
 /* ================== Travel mode ================== */
 const nearHarbor = () => WORLD && Math.hypot(T.x - WORLD.harbor.wx, T.y - WORLD.harbor.wy) < 6*TS;
@@ -3024,6 +3030,27 @@ function openDlg(id){ const d=$(id); if(d.open) return; holding=false; T.keys={}
 function toggleDlg(id){ if($('catchDlg').open || $('mapDlg').open) return; const d=$(id); d.open ? d.close() : openDlg(id); }
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click', ()=>b.closest('dialog').close()));
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click', e=>{ if(e.target===d && d.id!=='catchDlg' && d.id!=='mapDlg') d.close(); }));
+async function popOut(){
+  if(POPPED || !('documentPictureInPicture' in window)) return;
+  try{
+    saveWorld();
+    const w = Math.round(Math.min(760, screen.availWidth*.45)), h = Math.round(w*9/16 + 40);
+    const pip = await documentPictureInPicture.requestWindow({width:w, height:h});
+    pipWin = pip; POPPED = true; holding = false; T.keys = {}; joyEnd();
+    const d = pip.document; d.title = 'Driftwood Isles';
+    const st = d.createElement('style'); st.textContent = 'html,body{margin:0;height:100%;background:#081222;overflow:hidden}iframe{border:0;width:100%;height:100%;display:block}';
+    d.head.appendChild(st);
+    const fr = d.createElement('iframe'); fr.src = location.href.split('#')[0].split('?')[0] + '?popout=1'; fr.allow = 'autoplay; fullscreen; vibrate';
+    fr.addEventListener('load', () => fr.focus());
+    d.body.appendChild(fr);
+    $('poppedOv').hidden = false;
+    if(AC && AC.state === 'running') AC.suspend();
+    pip.addEventListener('pagehide', () => { location.reload(); });   // pick up the progress made in the pop-out
+  }catch(e){ POPPED = false; pipWin = null; toast("Couldn't open the pop-out window."); }
+}
+if('documentPictureInPicture' in window && !POPOUT && window.top === window) $('btnPop').hidden = false;
+$('btnPop').onclick = popOut;
+$('popBack').onclick = () => { if(pipWin) pipWin.close(); else location.reload(); };
 $('btnInv').onclick=()=>openDlg('invDlg'); $('btnAdmin').onclick=()=>openDlg('adminDlg'); $('btnSail').onclick=returnToSail;
 
 // Map size
@@ -3252,7 +3279,7 @@ document.addEventListener('touchend', e => {
   lastTouchEnd = now;
 }, {passive:false});
 document.addEventListener('touchmove', e => { if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
-if(IS_TOUCH && document.body.classList.contains('portrait') && !S.seen.rotate) setTimeout(() => { toast('Tip: turn your phone sideways for a bigger view.'); markSeen('rotate'); }, 1400);
+if(!POPOUT && IS_TOUCH && document.body.classList.contains('portrait') && !S.seen.rotate) setTimeout(() => { toast('Tip: turn your phone sideways for a bigger view.'); markSeen('rotate'); }, 1400);
 /* ================== Islands: going ashore ==================
    Stop the boat next to an island and go ashore. The island becomes a side-scrolling walk:
    you start on the beach where you landed, each screen-wide panel takes you further inland,
@@ -3612,6 +3639,7 @@ function render(){
 let last=performance.now();
 function loop(now){
   const dt = Math.min(.05, (now-last)/1000); last=now;
+  if(POPPED){ requestAnimationFrame(loop); return; }
   update(dt); render();
   requestAnimationFrame(loop);
 }
