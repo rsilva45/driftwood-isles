@@ -138,7 +138,12 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
 .invstat{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.invstat .chip{font-size:14px}
-body.touch[data-mode=travel]{touch-action:none}
+body.touch[data-mode=travel],body.touch[data-mode=land]{touch-action:none}
+body[data-mode="land"] #miniWrap, body[data-mode="land"] #gauge, body[data-mode="land"] #touchPad{display:none}
+#landPad{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));display:none;flex-direction:column;align-items:flex-end;gap:8px}
+body.touch[data-mode="land"] #landPad{display:flex}
+#landPad .pad.big{width:76px;height:76px;font-size:16px}
+#landPad .pad.down{background:rgba(40,70,100,.95)}
 #joy{position:fixed;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:2px solid rgba(239,227,200,.35);background:rgba(15,34,54,.25);z-index:40;pointer-events:none;opacity:0;transition:opacity .15s}
 #joy.on{opacity:1}#joy[hidden]{display:none}
 #joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;background:rgba(239,227,200,.45);border:2px solid rgba(239,227,200,.6);transform:translate(-50%,-50%)}
@@ -320,6 +325,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <button class="tool" id="toolBtn" aria-haspopup="dialog"><img alt=""><kbd>Q</kbd><span class="badge" id="toolBadge" hidden>0</span></button>
   </div>
   <button class="btn" id="strikeBtn" hidden>Strike! <kbd>Space</kbd></button>
+  <div id="landPad" aria-label="Island controls"><button class="pad wide" id="padReload2">Reload</button><button class="pad big" id="padJump">Jump</button></div>
   <div id="touchPad" aria-label="Depth controls">
     <button class="pad wide" id="padReel">Reel in</button>
     <button class="pad wide" id="padReload" hidden>Reload</button>
@@ -1374,6 +1380,7 @@ SFX.claw = () => { noise(.2,.2,3500); tone(700,.12,'sawtooth',.04,200); };
 SFX.zap = () => { noise(.35,.32,6000); tone(1800,.3,'sawtooth',.05,90); setTimeout(()=>noise(.25,.12,2500), 50); };
 SFX.zapboom = () => { noise(.7,.45,5000); tone(900,.6,'sawtooth',.07,40); noise(.8,.3,500); };
 SFX.hum = () => tone(240,.5,'sine',.04,520);
+SFX.jump = () => tone(300,.12,'square',.03,620);
 SFX.net = () => { noise(.3,.14,650); tone(220,.15,'triangle',.03,160); };
 let lastTick = 0;
 function sfx(n){ if(!S.sound) return; const a=ac(); if(!a) return; if(a.state==='suspended') a.resume(); SFX[n] && SFX[n](); }
@@ -1462,7 +1469,8 @@ function release(){ holding = false; holdFromWaiting = false; if(G.state==='char
 const IS_TOUCH_EARLY = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 const joyEl = $('joy'), joyKnob = joyEl.querySelector('i'), JOY_R = 54;
 function joyStart(e){
-  if(e.pointerType!=='touch' || G.mode!=='travel' || G.trans || anyDialog() || T.joy) return;
+  if(e.pointerType!=='touch' || (G.mode!=='travel' && G.mode!=='land') || G.trans || anyDialog() || T.joy) return;
+  if(G.mode==='land' && e.clientX >= innerWidth*.45) return;
   if(e.target.closest('button, a, input, select, label, dialog, .chip, #mini, .pad, #tools, #actions')) return;
   e.preventDefault(); ac();
   T.joy = {id:e.pointerId, x0:e.clientX, y0:e.clientY, dx:0, dy:0};
@@ -1487,6 +1495,7 @@ cvs.addEventListener('pointerdown', e => {
   if(e.button!==0 && e.pointerType==='mouse') return;
   e.preventDefault(); cvs.setPointerCapture?.(e.pointerId); ac();
   if(G.mode==='travel'){ if(e.pointerType==='touch' && IS_TOUCH_EARLY) return; if(!anyDialog() && !G.trans) T.ptr = canvasPoint(e); return; }
+  if(G.mode==='land'){ if(e.pointerType==='touch' && e.clientX < innerWidth*.45) return; if(!anyDialog() && !G.trans){ T.hover = canvasPoint(e); landFire(); } return; }
   T.hover = canvasPoint(e);
   press();
 });
@@ -1520,6 +1529,19 @@ window.addEventListener('keydown', e => {
   if(tag==='input'||tag==='select'||tag==='textarea') return;
   if(anyDialog()) return; // dialogs handle their own keys, including Esc
   if(KEYMAP[e.code]){ T.keys[KEYMAP[e.code]] = true; if(e.code.startsWith('Arrow')) e.preventDefault(); }
+  if(G.mode==='land'){
+    if(e.code==='Space' || e.code==='KeyW' || e.code==='ArrowUp'){ e.preventDefault(); if(!e.repeat){ heroJump(); HERO.jumpHeld = true; } return; }
+    if(e.repeat) return;
+    const k = e.key.toLowerCase();
+    if(k==='escape' || k==='e') returnToSail();
+    else if(k==='q') openDlg('wheelDlg');
+    else if(k==='r' && isGun(G.tool)) startReload();
+    else if(k==='t' && isGun(G.tool) && WEAPONS[G.tool].bolt) toggleAmmo();
+    else if(k >= '1' && k <= '9' && k.length===1){ const t = wheelTools()[+k-1]; if(t) selectTool(t); }
+    else if(k==='i') toggleDlg('invDlg'); else if(k==='g' || k==='`') toggleDlg('adminDlg');
+    return;
+  }
+  if(G.mode==='travel' && !e.repeat && (e.key==='l' || e.key==='L' || ((e.key==='e' || e.key==='E') && !nearHarbor())) && nearShore()){ tryGoAshore(); return; }
   if(e.code==='Space'){
     e.preventDefault(); if(e.repeat) return;
     if(G.mode==='travel') tryStartFishing(); else press();
@@ -1539,7 +1561,7 @@ window.addEventListener('keydown', e => {
   else if(k==='r' && G.mode==='fish' && (G.state==='waiting'||G.state==='sinking'||G.state==='bite')) startRetrieve();
   else if(k==='m'){ S.sound=!S.sound; save(); $('optSound').checked=S.sound; toast(S.sound?'Sound on':'Sound off'); }
 });
-window.addEventListener('keyup', e => { if(KEYMAP[e.code]) T.keys[KEYMAP[e.code]] = false; if(e.code==='Space') release(); });
+window.addEventListener('keyup', e => { if(KEYMAP[e.code]) T.keys[KEYMAP[e.code]] = false; if(e.code==='Space' || e.code==='KeyW' || e.code==='ArrowUp') HERO.jumpHeld = false; if(e.code==='Space') release(); });
 window.addEventListener('blur', ()=>{ holding=false; T.keys={}; T.ptr=null; joyEnd(); });
 addEventListener('visibilitychange', ()=>{ if(document.hidden) saveWorld(); });
 addEventListener('beforeunload', saveWorld);
@@ -1556,7 +1578,9 @@ function tryStartFishing(){
   sfx('anchor');
 }
 function returnToSail(){
-  if(G.trans || G.mode!=='fish') return;
+  if(G.trans) return;
+  if(G.mode==='land'){ G.trans = {t:0, dur:1, to:'travel', switched:false}; sfx('sail'); return; }
+  if(G.mode!=='fish') return;
   if(['reeling','landing','landed'].includes(G.state)){ toast('Land this fish or let it go before you sail.'); return; }
   if(G.state==='net' || G.state==='dyn'){ toast('Wait for the net or the blast to finish before you sail.'); return; }
   G.trans = {t:0, dur:1, to:'travel', switched:false};
@@ -1566,12 +1590,13 @@ function updateTrans(dt){
   const tr = G.trans; tr.t += dt;
   if(!tr.switched && tr.t >= tr.dur/2){
     tr.switched = true;
-    if(tr.to==='fish'){
+    if(tr.to==='land'){ enterIsland(tr.isl); G.mode='land'; }
+    else if(tr.to==='fish'){
       setLake(tr.info); G.mode='fish'; camY = 40;
       const zl = BIOMES[BIOME].name;
       if(tr.info.spot) toast(`Hot spot! ${zl}.`); else if(!S.seen['bio:'+BIOME]) toast(`${zl}, ${depthLabel(tr.info.depth)} deep.`);
       markSeen('bio:'+BIOME);
-    } else { if(M) toast('You left the Saltwight behind.'); M = null; G.mode='travel'; G.state='idle'; holding=false; saveWorld(); }
+    } else { if(M) toast('You left the Saltwight behind.'); M = null; if(G.mode==='land'){ ISL = null; LB = []; LO = []; G.bolts = []; } G.mode='travel'; G.state='idle'; holding=false; saveWorld(); }
     document.body.dataset.mode = G.mode;
   }
   if(tr.t >= tr.dur) G.trans = null;
@@ -1600,7 +1625,7 @@ function updateTravel(dt){
     if(m > .18){ const want = Math.atan2(J.dy, J.dx); let d = want - T.ang; d = Math.atan2(Math.sin(d), Math.cos(d)); turn = clamp(d*3, -1, 1); thr = Math.abs(d) > 2.4 && T.spd < 4 ? 0 : 1; cap = clamp((m - .18)/.7, .3, 1); }
     else { turn = 0; thr = 0; }
   }
-  if(G.mode!=='travel' && T.joy) joyEnd();
+  if(G.mode==='fish' && T.joy) joyEnd();
   if(G.trans || anyDialog()){ turn = 0; thr = 0; }
   T.ang += turn*2.6*dt*(.45 + .55*Math.min(1, Math.abs(T.spd)/b.speed + .25));
   if(thr>0) T.spd += 38*dt; else if(thr<0) T.spd -= 55*dt; else T.spd *= Math.pow(.3, dt);
@@ -1826,6 +1851,7 @@ function startLeap(f){
 /* ================== Tools: net and dynamite ================== */
 function toolReady(t){ return t==='rod' || (t==='net' && S.net>=0) || (t==='dyn' && S.dyn.count>0) || (isGun(t) && WS(t).lvl>=0); }
 function selectTool(t){
+  if(G.mode==='land'){ if(isGun(t) && toolReady(t)){ G.tool = t; sfx('tick'); } return; }
   if(G.mode!=='fish') return;
   if(G.state!=='idle'){ toast('Finish what you are doing first.'); return; }
   if(!toolReady(t)){ toast(t==='net' ? 'Buy a net at the harbor shop first.' : 'Buy dynamite at the harbor shop first.'); return; }
@@ -2286,11 +2312,21 @@ function startReload(){
   if(id !== 'shotgun') for(let i=0;i<spent;i++) parts.push({t:'casing', x:h.x + 3, y:h.y - 2, vx:rand(-20,10), vy:rand(-40,-15), life:2, wet:false});
   sfx('cock');
 }
-function updateGun(dt){
+function gunTimers(dt, land){
   const g = G.gun, id = curGun();
   g.cd = Math.max(0, g.cd - dt); g.shotT += dt;
   if(g.pending > 0){ g.pending -= dt; if(g.pending <= 0) startReload(); }
   if(g.reload && g.reload.id !== id) g.reload = null;   // switching weapons cancels a reload
+  if(land && g.reload){
+    const R = g.reload, st = WS(R.id); R.t += dt;
+    const loaded = Math.min(R.n, Math.floor(R.t / R.dur * (R.n + .5)));
+    while(R.done < loaded){ R.done++; if(!WEAPONS[R.id].bolt) sfx(R.id==='sniper' ? 'bolt' : 'click'); }
+    if(R.t >= R.dur){ st.mag += R.n; st.ammo -= R.cells; g.reload = null; sfx(WEAPONS[R.id].bolt ? 'tick' : 'cock'); save(); }
+  }
+}
+function updateGun(dt){
+  const g = G.gun, id = curGun();
+  gunTimers(dt, false);
   if(id && G.state==='idle'){
     g.aim += (gunAimAngle() - g.aim)*Math.min(1, dt*18);
     const steer = (T.keys.down ? 1 : 0) - (T.keys.up ? 1 : 0);
@@ -2553,6 +2589,7 @@ function drawGunHud(){
 function drawGunOverlay(fade){
   fxx.setTransform(1,0,0,1,0,0); fxx.clearRect(0, 0, fxc.width, fxc.height);
   const id = curGun();
+  if(G.mode==='land'){ if(!G.trans || G.trans.switched) drawLandGun(fade); return; }
   if(G.mode!=='fish' || !id || WS(id).lvl<0 || !G.rig.top) return;
   const art = GUN_ART[id]; if(!art.sheet.complete || !art.sheet.naturalWidth) return;
   if(G.state!=='idle' && G.state!=='charging') return;
@@ -2640,7 +2677,7 @@ function equipmentRow(){
 /* ================== Tool wheel ==================
    One button opens a wheel with every tool, so the bottom of the screen stays clear. */
 const TOOL_ORDER = ['rod','net','dyn','revolver','shotgun','sniper','lightning'];
-const wheelTools = () => TOOL_ORDER.filter(toolReady);   // only what you own (and have sticks for)
+const wheelTools = () => TOOL_ORDER.filter(t => toolReady(t) && (G.mode!=='land' || isGun(t)));   // only what you own (and have sticks for)
 function toolInfo(t){
   if(t==='rod') return {name:rod().name, info:'Cast and reel', badge:''};
   if(t==='net') return S.net>=0 ? {name:NETS[S.net].name, info:`Holds ${NETS[S.net].cap} fish`, badge:''} : {name:'Net', info:'Buy at the harbor', badge:''};
@@ -2664,7 +2701,7 @@ function renderWheel(){
   });
   const ti = toolInfo(G.tool); $('wheelName').textContent = ti.name; $('wheelInfo').textContent = ti.info;
 }
-$('toolBtn').onclick = () => { if(G.mode==='fish') openDlg('wheelDlg'); };
+$('toolBtn').onclick = () => { if(G.mode==='fish' || G.mode==='land') openDlg('wheelDlg'); };
 
 /* ================== Fishing update ================== */
 function updateRig(dt){
@@ -3276,6 +3313,8 @@ let lastHint='', lastActions='';
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches;
 if(IS_TOUCH) document.body.classList.add('touch');
 const TOUCH_TEXT = [
+  ['Walk with A and D or the arrows, jump with W or Space. Walk right to explore the island.', 'Drag on the left side to walk, push up or tap Jump to jump. Walk right to explore.'],
+  ['Click to shoot where you aim. R reloads.', 'Tap where you want to shoot.'],
   ['Hold click or Space to cast.', 'Press and hold to cast, then let go.'],
   ['Click to fire lightning', 'Tap to fire lightning'], [' T switches to delayed cells.', ''], ['Click where the charge should burst', 'Tap where the charge should burst'],
   [' T switches cells. Scroll to look deeper.', ' Use the arrows to look deeper.'], ['Press T to switch back to power cells.', 'Tap Normal cells to switch back.'],
@@ -3309,7 +3348,7 @@ function setHint(t, alert){ t = touchText(t); if(t!==lastHint){ hintEl.textConte
 function setActions(list){
   const key = list.map(a=>a.id).join('|'); if(key===lastActions) return; lastActions = key;
   actionsEl.innerHTML = list.map(a=>`<button class="btn" data-act="${a.id}">${a.label} <kbd>${a.key}</kbd></button>`).join('');
-  actionsEl.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { if(b.dataset.act==='harbor') tryEnterHarbor(); else tryStartFishing(); });
+  actionsEl.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { const a = b.dataset.act; if(a==='harbor') tryEnterHarbor(); else if(a==='ashore') tryGoAshore(); else if(a==='boat') returnToSail(); else tryStartFishing(); });
 }
 const padEl = $('touchPad');
 let padKey = '';
@@ -3333,6 +3372,8 @@ function bindPad(id, sign){
 bindPad('padUp', -1); bindPad('padDown', 1);
 $('padReload').addEventListener('click', () => startReload());
 $('padAmmo').addEventListener('click', () => toggleAmmo());
+{ const jb = $('padJump'); jb.addEventListener('pointerdown', e => { e.preventDefault(); ac(); heroJump(); HERO.jumpHeld = true; jb.classList.add('down'); }); ['pointerup','pointercancel','pointerleave'].forEach(ev => jb.addEventListener(ev, () => { HERO.jumpHeld = false; jb.classList.remove('down'); })); }
+$('padReload2').addEventListener('click', () => startReload());
 $('gunChip').addEventListener('click', () => { if(G.mode==='fish' && G.state==='idle') toggleAmmo(); });
 $('padReel').addEventListener('click', () => { if(G.mode==='fish' && (G.state==='waiting'||G.state==='sinking'||G.state==='bite')) startRetrieve(); });
 function updateHud(){
@@ -3349,11 +3390,24 @@ function updateHud(){
     const acts = [];
     if(nearHarbor()) acts.push({id:'harbor', label:'Enter harbor', key:'E'});
     if(stopped() && info) acts.push({id:'fish', label: info.spot ? 'Fish the hot spot' : 'Cast line', key:'Space'});
+    if(!G.trans && nearShore()) acts.push({id:'ashore', label:'Go ashore', key: nearHarbor() ? 'L' : 'E'});
     setActions(G.trans ? [] : acts);
     if(G.trans || !stopped()) setHint(''); else tipHint('sail', 'Sail with W A S D or the arrow keys, or hold the mouse where you want to go.');
     gaugeEl.classList.remove('on');
     return;
   }
+  if(G.mode==='land'){
+    $('depthChip').hidden = true; gaugeEl.classList.remove('on'); updateTools(); updateThreat();
+    $('tools').style.display = wheelTools().length ? '' : 'none';
+    { const pr = $('padReload2'), hide = !curGun() || (WEAPONS[curGun()].bolt && WS(curGun()).alt); if(pr.hidden !== hide) pr.hidden = hide; }
+    setActions(!G.trans && ISL && HERO.x < 74 ? [{id:'boat', label:'Back to boat', key:'E'}] : []);
+    if(G.trans || !ISL) setHint('');
+    else if(curGun() && S.seen.land) tipHint('gun:land', 'Click to shoot where you aim. R reloads.');
+    else tipHint('land', 'Walk with A and D or the arrows, jump with W or Space. Walk right to explore the island.');
+    if(Math.abs(HERO.vx) > 20 && HERO.x > 130) markSeen('land');
+    return;
+  }
+  $('tools').style.display = '';
   setActions([]);
   const wet = isWet();
   $('depthChip').hidden = !wet;   // the lure's depth, only while it's in the water
@@ -3647,12 +3701,349 @@ document.addEventListener('touchend', e => {
 }, {passive:false});
 document.addEventListener('touchmove', e => { if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
 if(IS_TOUCH && document.body.classList.contains('portrait') && !S.seen.rotate) setTimeout(() => { toast('Tip: turn your phone sideways for a bigger view.'); markSeen('rotate'); }, 1400);
+/* ================== Islands: going ashore ==================
+   Stop the boat next to an island and go ashore. The island becomes a side-scrolling walk:
+   you start on the beach where you landed, each screen-wide panel takes you further inland,
+   and the last panel is the beach on the far side. The walk follows the island on the chart:
+   its length comes from how wide the island is, and its sand, grass, forest and rock come from
+   the tiles along your path. The look comes from the biome around it. */
+const WL = 160;                        // sea level on the beaches (screen y)
+const HERO = {x:0, y:0, vx:0, vy:0, face:1, ground:true, coyote:0, jbuf:0, walkT:0, jumpHeld:false};
+let ISL = null, camX = 0, LB = [], LO = [], LP = [];   // island, land bullets, land orbs (delayed cells), land particles
+const ISL_THEMES = {
+  tropical:{sand:['#e6d199','#d4bc82'], top:['#77b25c','#679f4f'], dirt:['#8a6a44','#6e5236','#553e28'], rock:['#8d8a7c','#6f6c60','#5a574c'], far:['#7aa8a0','#62948a'], sea:'#2f9ab4'},
+  mangrove:{sand:['#b8a878','#9a8a5e'], top:['#4a7a3a','#3e6a32'], dirt:['#5a4a30','#463a24','#352a1a'], rock:['#6e6a58','#58544a','#45423a'], far:['#5a8a72','#4a7860'], sea:'#3f7a62'},
+  volcanic:{sand:['#5a5050','#4a4244'], top:['#4e4448','#3e363a'], dirt:['#2e2629','#241e21','#1a1517'], rock:['#3a3438','#2c272b','#1e1a1d'], far:['#6a6070','#58506a'], sea:'#4a5a70'},
+  frozen:{sand:['#eef6fa','#d6e6ee'], top:['#f4f9fc','#e0ecf2'], dirt:['#7890a0','#5e7484','#4a5e6c'], rock:['#8a9aa6','#6e7e8a','#56646e'], far:['#8eaec2','#7896ac'], sea:'#6aa8c4'},
+  rocky:{sand:['#b8b0a0','#a0988a'], top:['#7a8a6a','#6a7a5a'], dirt:['#6a6458','#565046','#433e36'], rock:['#7e8278','#666a62','#50544c'], far:['#6a7a88','#586876'], sea:'#1f5a8a'},
+};
+const themeOf = b => b===B.frozen ? 'frozen' : b===B.volcanic ? 'volcanic' : b===B.mangrove ? 'mangrove' : b===B.deep || b===B.abyss ? 'rocky' : 'tropical';
+
+// the nearest land tile within reach of the boat
+function shoreTile(){
+  if(!WORLD) return null;
+  const N = WORLD.N, bx = T.x/TS, by = T.y/TS; let best = null, bd = 1e9;
+  for(let y=Math.floor(by)-3; y<=Math.floor(by)+3; y++) for(let x=Math.floor(bx)-3; x<=Math.floor(bx)+3; x++){
+    if(x<0||y<0||x>=N||y>=N) continue; const i = y*N+x; if(!WORLD.land[i]) continue;
+    const d = Math.hypot(x+.5-bx, y+.5-by); if(d < bd){ bd = d; best = i; }
+  }
+  return bd <= 3.3 ? best : null;
+}
+const nearShore = () => stopped() && shoreTile() != null;
+function tryGoAshore(){
+  if(G.trans || G.mode!=='travel') return;
+  if(!stopped()){ toast('Slow to a stop before you go ashore.'); return; }
+  const i0 = shoreTile(); if(i0 == null) return;
+  G.trans = {t:0, dur:1.1, to:'land', isl:readIsland(i0), switched:false};
+  sfx('anchor');
+}
+// Flood-fill the island and read its tiles along a line from the landing spot across it
+function readIsland(i0){
+  const w = WORLD, N = w.N, seen = new Uint8Array(N*N), q = [i0]; seen[i0] = 1; let sx = 0, sy = 0, minI = i0;
+  for(let h=0; h<q.length && q.length < 40000; h++){
+    const i = q[h], x = i%N, y = (i/N)|0; sx += x; sy += y; if(i < minI) minI = i;
+    for(const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]){ if(nx<0||ny<0||nx>=N||ny>=N) continue; const n = ny*N+nx; if(w.land[n] && !seen[n]){ seen[n] = 1; q.push(n); } }
+  }
+  const x0 = i0%N, y0 = (i0/N)|0, cx = sx/q.length, cy = sy/q.length;
+  let dx = cx - x0, dy = cy - y0, L = Math.hypot(dx, dy);
+  if(L < .8){ dx = Math.cos(T.ang); dy = Math.sin(T.ang); L = 1; }
+  dx /= L; dy /= L;
+  const prof = [];
+  for(let s=0; s<500; s+=.5){ const x = Math.floor(x0+.5+dx*s), y = Math.floor(y0+.5+dy*s); if(x<0||y<0||x>=N||y>=N) break; const i = y*N+x; if(!w.land[i]){ if(prof.length > 1) break; continue; } prof.push(w.land[i]); }
+  // the biome of the water around the island sets its look
+  const cnt = {}; for(let k=0; k<q.length; k+=Math.max(1, q.length>>8)){ const i = q[k], x = i%N, y = (i/N)|0; for(const [nx,ny] of [[x+2,y],[x-2,y],[x,y+2],[x,y-2]]){ if(nx<0||ny<0||nx>=N||ny>=N) continue; const n = ny*N+nx; if(!w.land[n]) cnt[w.biome[n]] = (cnt[w.biome[n]]||0) + 1; } }
+  let bio = B.shallows, bc = -1; for(const k in cnt) if(cnt[k] > bc){ bc = cnt[k]; bio = +k; }
+  if(w.cold[i0]) bio = B.frozen;
+  const tiles = prof.length/2, panels = clamp(Math.round(tiles/2.6), 2, 10);
+  return {prof, panels, bio, theme:themeOf(bio), seed:(w.seed ^ Math.imul(minI+1, 2654435761)) >>> 0, size:q.length, home:Math.hypot(x0 - N/2, y0 - N/2) < 12};
+}
+
+/* ----- building the walk ----- */
+const LEVEL_Y = {1:150, 2:138, 3:128, 4:110};
+function buildIsland(info){
+  const R0 = mulberry32(info.seed), R = (a,b) => a + R0()*(b-a), TH = ISL_THEMES[info.theme];
+  const NW = info.panels*W, hgt = new Float32Array(NW), lvl = new Uint8Array(NW), prof = info.prof.length ? info.prof : [1,2,1];
+  // raw height from the profile, then smoothed, plus some rolling noise
+  const raw = new Float32Array(NW);
+  for(let x=0;x<NW;x++){ const u = x/(NW-1), p = prof[Math.min(prof.length-1, Math.floor(u*prof.length))]; lvl[x] = p; raw[x] = LEVEL_Y[p] ?? 140; }
+  const ph = [R(0,6), R(0,6), R(0,6)], rad = 28;
+  let acc = 0; const pre = new Float32Array(NW+1); for(let x=0;x<NW;x++){ acc += raw[x]; pre[x+1] = acc; }
+  for(let x=0;x<NW;x++){ const a = Math.max(0, x-rad), b = Math.min(NW, x+rad+1); let h = (pre[b]-pre[a])/(b-a);
+    h += Math.sin(x*.021 + ph[0])*4 + Math.sin(x*.057 + ph[1])*2 + (lvl[x] >= 3 ? Math.sin(x*.013 + ph[2])*6 : 0);
+    const ss = t => t<=0 ? 0 : t>=1 ? 1 : t*t*(3-2*t), eL = ss((x-14)/56), eR = ss((NW-1-x-14)/56), e = Math.min(eL, eR);
+    hgt[x] = e < 1 ? lerp(WL + 14, h, e) : h;
+    if(x < 90 || x > NW-90) lvl[x] = 1;
+  }
+  // one-way ledges to jump on, away from the beaches
+  const plats = [];
+  for(let p=1; p<info.panels-1; p++){ const n = R0() < .55 ? 2 : 1; for(let k=0;k<n;k++){ const w = Math.round(R(30, 58)), x = Math.round(p*W + R(30, W-30-w)), g = Math.min(hgt[x], hgt[x+w-1], hgt[x+(w>>1)]); plats.push({x, w, y:Math.round(g - R(20, 33))}); } }
+  // the terrain canvas: ground, back decorations and ledges are drawn once
+  const [terrC, g] = mk(NW, H), [frontC, fg] = mk(NW, H);
+  const put = (gg, x, y, c) => { gg.fillStyle = c; gg.fillRect(Math.round(x), Math.round(y), 1, 1); };
+  const rect = (gg, x, y, w, h, c) => { gg.fillStyle = c; gg.fillRect(Math.round(x), Math.round(y), w, h); };
+  const deco = [], glows = [];
+  for(let x=0;x<NW;x++){
+    const top = Math.round(hgt[x]), L = lvl[x], sand = L===1, hh = hash2(x, info.seed & 1023);
+    const surf = sand ? TH.sand : L===4 ? TH.rock : TH.top;
+    rect(g, x, top, 1, 1, surf[hh%5===0 ? 1 : 0]); rect(g, x, top+1, 1, 1, surf[1]);
+    for(let y=top+2; y<H; y++){ const d = y-top, c = sand ? (d < (info.theme==='frozen' ? 4 : 9) ? TH.sand[1] : TH.dirt[d < 20 ? 0 : 1]) : L===4 ? TH.rock[d < 14 ? 1 : 2] : TH.dirt[d < 8 ? 0 : d < 22 ? 1 : 2]; rect(g, x, y, 1, 1, (hash2(x, y) % 23 === 0) ? shade(c, .12) : c); }
+    if(info.theme==='volcanic' && hash2(x, 77) % 41 === 0 && !sand) rect(g, x, top+2, 1, 3 + hash2(x,5)%5, '#ff6a2a');
+  }
+  // ledges
+  for(const p of plats){
+    const c = info.theme==='frozen' ? ['#e8f6fa','#a8d0e0','#8ab4c8'] : info.theme==='volcanic' ? ['#4a3e42','#2e262a','#1e181b'] : lvl[p.x] >= 3 ? ['#8a6a44','#6a4e30','#4e3820'] : ['#9a968a','#7a766a','#5a574c'];
+    rect(g, p.x, p.y, p.w, 2, c[0]); rect(g, p.x, p.y+2, p.w, 3, c[1]); rect(g, p.x+2, p.y+5, p.w-4, 2, c[2]);
+    if(info.theme==='frozen') for(let i=3;i<p.w-2;i+=4) rect(g, p.x+i, p.y+7, 1, 1 + hash2(i, p.x)%3, '#cfeaf4');
+    if(lvl[p.x] >= 3 && info.theme!=='frozen' && info.theme!=='volcanic') for(let i=0;i<p.w;i+=6) rect(g, p.x+i, p.y+1, 1, 3, '#5a4028');
+  }
+  // trees, rocks and plants, chosen by the ground they stand on
+  const tree = (x, base, kind, s) => {
+    if(kind==='palm'){ const h = 24 + s*10, lean = R(-.25, .25); let tx = x;
+      for(let i=0;i<h;i++){ tx = x + lean*i*.6 + Math.sin(i*.12)*1.2; rect(g, tx, base-i, 2, 1, i%4===0 ? '#8a6a3a' : '#a8844a'); }
+      for(let k=0;k<6;k++){ const an = -Math.PI/2 + (k-2.5)*.55, L = 12 + R(0,5); for(let i=0;i<L;i++){ const fx = tx+1 + Math.cos(an)*i, fy = base-h + Math.sin(an)*i*.6 + i*i*.025; rect(g, fx, fy, 1, 1, i%3===0 ? '#4f8a3a' : '#5ea844'); rect(g, fx, fy+1, 1, 1, '#3e7030'); } }
+      rect(g, tx, base-h+1, 2, 2, '#6a4a2a'); }
+    else if(kind==='broad' || kind==='mangrove'){ const h = 14 + s*10, r = 8 + s*5;
+      rect(g, x, base-h, 3, h, '#6a4a2e'); rect(g, x+2, base-h, 1, h, '#4e3620');
+      if(kind==='mangrove') for(let k=-2;k<=2;k++) for(let i=0;i<7;i++){ rect(g, x+1 + k*i*.9, base - 7 + i, 1, 1, '#5a4632'); }
+      const cols = kind==='mangrove' ? ['#2a5030','#356238','#3f7040'] : ['#3f7a46','#4e8f50','#5ea85a'];
+      for(const [ox,oy,rr,ci] of [[-r*.6,-h-r*.2,r*.8,0],[r*.6,-h-r*.1,r*.75,0],[0,-h-r*.6,r,1],[-r*.2,-h-r*.9,r*.6,2]]) for(let yy=-rr; yy<=rr; yy++){ const ww = Math.round(Math.sqrt(rr*rr-yy*yy)); rect(g, x+1+ox-ww, base+oy+yy, ww*2, 1, cols[ci]); } }
+    else if(kind==='pine'){ const h = 20 + s*14;
+      rect(g, x, base-6, 2, 6, '#5a4030');
+      for(let t=0;t<4;t++){ const ty = base - 6 - t*(h/5), w = (4-t)*3.5 + 3; for(let i=0;i<h/4;i++){ const ww = w*(1 - i/(h/4)); rect(g, x+1-ww, ty-i, ww*2, 1, i===0 ? '#e8f4f8' : '#2e5a48'); if(i%3===0) rect(g, x+1-ww, ty-i, 2, 1, '#f2f8fb'); } } }
+    else if(kind==='dead'){ const h = 16 + s*12;
+      rect(g, x, base-h, 2, h, '#2a2224');
+      for(let k=0;k<4;k++){ const by = base - h*.4 - k*h*.15, dir = k%2 ? 1 : -1; for(let i=0;i<6+k;i++) rect(g, x + dir*i, by - i*.6, 1, 1, '#2a2224'); } }
+  };
+  for(let x=24; x<NW-24; x += Math.round(R(10, 30))){
+    const L = lvl[x], base = Math.round(hgt[x]) + 1, s = R0();
+    if(base > WL - 1) continue;           // under water
+    const roll = R0(), th = info.theme;
+    if(L===1){
+      if(th==='tropical' && roll < .35) tree(x, base, 'palm', s);
+      else if(th==='frozen' && roll < .28) tree(x, base, 'pine', s*.6);
+      else if(th==='mangrove' && roll < .45) tree(x, base, 'mangrove', s);
+      else if(roll < .6){ const k = Math.floor(R(0,3)); if(th==='frozen') rect(g, x, base-3, 5, 3, '#cfeaf4'); else if(th==='volcanic') { rect(g, x, base-2, 4, 2, '#2a2428'); } else if(k===0){ rect(g, x, base-1, 2, 1, '#f2e6d8'); rect(g, x+1, base-2, 1, 1, '#e8b8a8'); } else if(k===1){ rect(g, x, base-2, 12, 2, '#9a7a52'); rect(g, x, base-2, 12, 1, '#b8946a'); } else for(let i=0;i<3;i++) rect(fg, x+i*2, base-3-(i%2), 1, 3, '#a8a050'); }
+    } else if(L===2 || L===3){
+      const treeK = th==='frozen' ? 'pine' : th==='volcanic' ? 'dead' : th==='mangrove' ? 'mangrove' : (th==='rocky' ? 'pine' : 'broad');
+      if(roll < (L===3 ? .62 : .32)) tree(x, base, treeK, s);
+      else if(roll < .75){ const c = th==='frozen' ? '#dfeef4' : th==='volcanic' ? '#3a3236' : '#3e7a40'; for(let yy=-4;yy<=0;yy++){ const ww = Math.round(Math.sqrt(16-yy*yy)*1.3); rect(g, x-ww, base+yy, ww*2, 1, c); } if(th==='tropical' && R0()<.6){ rect(g, x-2, base-3, 1, 1, '#ff8ab8'); rect(g, x+2, base-2, 1, 1, '#ffd25e'); } }
+      if(th!=='volcanic' && th!=='frozen') for(let i=0;i<4;i++) rect(fg, x+6+i*2, base-2-((i+x)%3), 1, 2 + (i%2), th==='mangrove' ? '#3a6a30' : '#5aa84a');
+    } else {
+      if(roll < .45){ const r = 4 + Math.round(s*5); for(let yy=-r; yy<=0; yy++){ const ww = Math.round(Math.sqrt(r*r-yy*yy)*1.3); rect(g, x-ww, base+yy, ww*2, 1, yy < -r*.5 ? TH.rock[0] : TH.rock[1]); } }
+      else if(th==='volcanic' && roll < .7){ const w = 10 + Math.round(s*10); rect(g, x, base-1, w, 3, '#ff7a2a'); rect(g, x+1, base-1, w-2, 1, '#ffd27a'); glows.push({x:x + w/2, y:base, r:20 + w}); }
+      else if(th==='frozen' && roll < .7) tree(x, base, 'pine', s);
+    }
+  }
+  // far ridge for parallax: low near the beaches (the sea shows), higher inland
+  const BW = W + Math.ceil(NW*.5), [backC, bg] = mk(BW, H);
+  for(let x=0;x<BW;x++){ const u = clamp((x - W*.25)/(BW - W*.5), 0, 1), inland = Math.sin(Math.PI*u);
+    const h1 = 112 - inland*22 + Math.sin(x*.03 + ph[0])*4 + Math.sin(x*.011)*5, h2 = 119 - inland*13 + Math.sin(x*.05 + ph[1])*3;
+    rect(bg, x, h1, 1, H, TH.far[0]); rect(bg, x, h2, 1, H, TH.far[1]); }
+  // things that move
+  const crabs = info.theme==='frozen' || info.theme==='volcanic' ? [] : [{x:R(70,140), dir:1, minX:60, maxX:150}, {x:NW - R(70,140), dir:-1, minX:NW-150, maxX:NW-60}].map(c => ({...c, alive:true, t:R(0,3)}));
+  const flies = Array.from({length:22}, () => ({x:R(0,NW), y:R(70,140), ph:R(0,6)}));
+  return {...info, NW, hgt, lvl, plats, terrC, frontC, backC, glows, crabs, flies, TH};
+}
+const groundAt = x => { if(!ISL) return H; const i = clamp(Math.round(x), 0, ISL.NW-1); return ISL.hgt[i]; };
+function enterIsland(info){
+  ISL = buildIsland(info);
+  HERO.x = 58; HERO.y = groundAt(58); HERO.vx = HERO.vy = 0; HERO.face = 1; HERO.ground = true; camX = 0;
+  LB = []; LO = []; LP = []; G.bolts = []; G.orbs = []; fishes = []; M = null; G.state = 'idle';
+  if(!isGun(G.tool)){ const g = WEAPON_IDS.find(id => WS(id).lvl >= 0); if(g) G.tool = g; }
+  markSeen('ashore');
+  toast(info.home ? 'You walk onto your home island.' : `You come ashore. ${info.panels} stretches to the far beach.`);
+}
+
+/* ----- update ----- */
+function heroJump(){ HERO.jbuf = .14; }
+function updateLand(dt){
+  const H0 = HERO, k = T.keys;
+  let dir = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+  if(T.joy){ const m = T.joy.dx/JOY_R; dir = Math.abs(m) > .2 ? clamp(m*1.3, -1, 1) : 0; if(T.joy.dy < -JOY_R*.55 && !T.joy.jumped){ T.joy.jumped = true; heroJump(); } if(T.joy.dy > -JOY_R*.3) T.joy.jumped = false; }
+  if(G.trans || anyDialog()) dir = 0;
+  const speed = 72;
+  H0.vx += (dir*speed - H0.vx)*Math.min(1, dt*(H0.ground ? 14 : 6));
+  H0.vy = Math.min(420, H0.vy + 600*dt);
+  H0.coyote -= dt; H0.jbuf -= dt;
+  if(H0.ground) H0.coyote = .1;
+  if(H0.jbuf > 0 && H0.coyote > 0){ H0.vy = -212; H0.coyote = 0; H0.jbuf = 0; H0.ground = false; sfx('jump'); }
+  if(!H0.jumpHeld && H0.vy < -90) H0.vy *= Math.pow(.02, dt);   // let go early for a short hop
+  // walk: step up gentle slopes, stop at cliffs and the sea
+  let nx = clamp(H0.x + H0.vx*dt, 10, ISL.NW - 10);
+  const gN = groundAt(nx);
+  if(H0.ground && gN < H0.y - 7 && !onPlat(H0)) nx = H0.x;
+  if(gN > WL + 3 && nx < H0.x && nx < ISL.NW/2) nx = H0.x;   // the sea at the near beach (the boat is there)
+  if(gN > WL + 3 && nx > H0.x && nx > ISL.NW/2) nx = H0.x;   // and at the far beach
+  H0.x = nx;
+  if(Math.abs(H0.vx) > 4) H0.face = Math.sign(H0.vx);
+  // fall, land on the ground or on a ledge from above
+  const ny = H0.y + H0.vy*dt, g = groundAt(H0.x); let landed = false;
+  if(H0.vy >= 0) for(const p of ISL.plats){ if(H0.x >= p.x-2 && H0.x <= p.x+p.w+2 && H0.y <= p.y + .5 && ny >= p.y){ H0.y = p.y; H0.vy = 0; landed = true; break; } }
+  if(!landed){ if(ny >= g){ H0.y = g; H0.vy = 0; landed = true; } else if(H0.ground && H0.vy >= 0 && g - H0.y < 5 && !onPlat(H0)){ H0.y = g; landed = true; } else H0.y = ny; }
+  if(landed && !H0.ground && H0.vy === 0) for(let i=0;i<3;i++) LP.push({t:'dust', x:H0.x + rand(-3,3), y:H0.y-1, vx:rand(-14,14), vy:rand(-10,-2), life:.35});
+  H0.ground = landed;
+  H0.walkT += Math.abs(H0.vx)*dt;
+  // the camera moves one panel at a time
+  const panel = clamp(Math.floor(H0.x / W), 0, ISL.panels-1), tx = panel*W;
+  camX += (tx - camX)*Math.min(1, dt*9); if(Math.abs(tx - camX) < .5) camX = tx;
+  if(panel === ISL.panels-1 && !S.seen['farbeach:'+ISL.seed]){ markSeen('farbeach:'+ISL.seed); toast('You reached the far beach.'); }
+  // aim: face the cursor when holding a gun
+  const id = curGun(); if(id && T.hover){ const hx = H0.x, wx = T.hover.x + camX; if(Math.abs(wx - hx) > 2 && !T.joy) H0.face = wx > hx ? 1 : -1; }
+  gunTimers(dt, true); updateLightning(dt); updateLandShots(dt);
+  for(const c of ISL.crabs){ if(!c.alive) continue; c.t += dt; const near = Math.abs(c.x - H0.x) < 26; c.x += c.dir*(near ? 34 : 9)*dt*(Math.sin(c.t*3) > -.3 ? 1 : 0); if(c.x < c.minX || c.x > c.maxX) c.dir *= -1; if(near) c.dir = c.x > H0.x ? 1 : -1; c.x = clamp(c.x, c.minX, c.maxX); }
+  for(const p of LP){ p.life -= dt; p.x += p.vx*dt; p.y += p.vy*dt; if(p.t==='debris') p.vy += 200*dt; }
+  LP = LP.filter(p => p.life > 0);
+  if(ISL.theme==='volcanic' && Math.random() < dt*6) LP.push({t:'ember', x:camX + rand(0,W), y:H+2, vx:rand(-6,6), vy:rand(-26,-12), life:rand(3,6)});
+}
+const onPlat = h => ISL.plats.some(p => h.x >= p.x-2 && h.x <= p.x+p.w+2 && Math.abs(h.y - p.y) < .6);
+
+/* ----- weapons on land ----- */
+const heroHand = () => ({x:HERO.x + HERO.face*2.5, y:HERO.y - 10});
+function landAim(){ // angle in degrees relative to facing: negative is up
+  const h = heroHand(); if(!T.hover) return 0;
+  const wx = T.hover.x + camX, wy = T.hover.y;
+  return clamp(Math.atan2(wy - h.y, Math.max(2, (wx - h.x)*HERO.face))*180/Math.PI, -80, 80);
+}
+function landMuzzle(id, aDeg){
+  const h = heroHand(), a = aDeg*Math.PI/180, [mx, my] = GUN_ART[id].muzzle;
+  return {x:h.x + HERO.face*(mx*Math.cos(a) - my*Math.sin(a))/GUN_K, y:h.y + (mx*Math.sin(a) + my*Math.cos(a))/GUN_K};
+}
+const landSolid = (x, y) => y >= groundAt(x) || ISL.plats.some(p => x >= p.x && x <= p.x+p.w && y >= p.y && y <= p.y+6);
+function landFire(){
+  const id = curGun(); if(!id || WS(id).lvl < 0 || !ISL) return;
+  const g = G.gun, w = WEAPONS[id], t = wTier(id), st = WS(id);
+  if(g.reload){ sfx('dry'); return; }
+  if(g.cd > 0) return;
+  g.aim = landAim(); const m = landMuzzle(id, g.aim), a = g.aim*Math.PI/180, dx = Math.cos(a)*HERO.face, dy = Math.sin(a);
+  if(w.bolt && st.alt){
+    if(st.ammo2 <= 0){ sfx('dry'); toast('Out of delayed power cells. Press T to switch back.'); return; }
+    st.ammo2--; g.cd = t.reload; g.shotT = 0;
+    const tx = T.hover ? T.hover.x + camX : m.x + dx*120, ty = T.hover ? T.hover.y : m.y + dy*120;
+    LO.push({x:m.x, y:m.y, tx, ty, phase:'fly', t:0, tier:t}); sfx('hum'); save(); return;
+  }
+  if(st.mag <= 0){
+    if(st.ammo <= 0){ sfx('dry'); toast(`Out of ${w.ammoName.toLowerCase()}. Buy more at the harbor shop.`); }
+    else if(w.auto) startReload(); else { sfx('dry'); toast('Reload first: press R.'); }
+    return;
+  }
+  st.mag--; g.cd = t.cool; g.shotT = 0; markSeen('gun:land');
+  if(w.bolt){ // trace to the ground (or the end of its range), then crackle there
+    const reach = t.range*FT*1.6; let x = m.x, y = m.y;
+    for(let s=0; s<reach; s+=2){ x = m.x + dx*s; y = m.y + dy*s; if(landSolid(x, y) || y < -10) break; }
+    const links = [{a:{x:m.x, y:m.y}, b:{x, y}, d:0, main:true}];
+    for(let k=0;k<4;k++){ const an = rand(-Math.PI, 0), L = rand(6, 14); links.push({a:{x, y}, b:{x:x + Math.cos(an)*L, y:y + Math.sin(an)*L}, d:1, spoke:true}); }
+    G.bolts.push({links, t:0, dur:.42, gen:-1}); G.zapFlash = .3; sfx('zap'); doShake(2.5);
+    landHitCrabs(x, y, 10);
+  } else {
+    const n = t.pellets || 1, spread = (t.spread || 0)*Math.PI/180;
+    for(let i=0;i<n;i++){ const off = n > 1 ? (-spread/2 + spread*(i + Math.random()*.8 + .1)/n) : 0, aa = a + off;
+      LB.push({x:m.x, y:m.y, dx:Math.cos(aa)*HERO.face, dy:Math.sin(aa), spd:w.speed*(n > 1 ? rand(.88, 1.08) : 1), left:t.range*FT*1.6, kind:id, pierce:w.pierce}); }
+    sfx(id==='shotgun' ? 'blast' : id==='sniper' ? 'rifle' : 'shot'); doShake(id==='revolver' ? 1.5 : 3);
+  }
+  LP.push({t:'flash', x:m.x, y:m.y, vx:0, vy:0, life:.08});
+  if(st.mag === 0 && st.ammo > 0 && w.auto) g.pending = .3;
+  save();
+}
+function landHitCrabs(x, y, r){ for(const c of ISL.crabs) if(c.alive && Math.hypot(c.x - x, groundAt(c.x) - 2 - y) < r){ c.alive = false; for(let i=0;i<6;i++) LP.push({t:'debris', x:c.x, y:groundAt(c.x)-2, vx:rand(-30,30), vy:rand(-60,-20), life:.6, c:'#e8573a'}); sfx('thunk'); } }
+function updateLandShots(dt){
+  for(const b of LB){
+    let remain = b.spd*dt;
+    while(remain > 0 && !b.dead){ const st = Math.min(3, remain); remain -= st; b.x += b.dx*st; b.y += b.dy*st; b.left -= st;
+      if(b.left <= 0 || b.y < -20 || b.x < camX - 20 || b.x > camX + W + 20){ b.dead = true; break; }
+      if(landSolid(b.x, b.y)){ b.dead = true; for(let i=0;i<4;i++) LP.push({t:'debris', x:b.x, y:b.y-1, vx:rand(-30,30), vy:rand(-50,-10), life:.4, c:ISL.TH.dirt[0]}); break; }
+      landHitCrabs(b.x, b.y, 4);
+    }
+  }
+  LB = LB.filter(b => !b.dead);
+  for(const o of LO){
+    o.t += dt;
+    if(o.phase==='fly'){ const dx = o.tx - o.x, dy = o.ty - o.y, d = Math.hypot(dx, dy), sp = 260*dt;
+      if(d <= sp){ o.x = o.tx; o.y = o.ty; o.phase = 'arm'; o.t = 0; sfx('hum'); } else { o.x += dx/d*sp; o.y += dy/d*sp; }
+      if(landSolid(o.x, o.y)){ o.y = Math.min(o.y, groundAt(o.x) - 1); o.phase = 'arm'; o.t = 0; sfx('hum'); } }
+    else if(o.phase==='arm' && o.t > .55){
+      const R = o.tier.burst, links = []; for(let k=0;k<11;k++){ const an = k/11*Math.PI*2 + rand(-.2,.2), L = R*rand(.8,1.4); links.push({a:{x:o.x, y:o.y}, b:{x:o.x + Math.cos(an)*L, y:o.y + Math.sin(an)*L}, d:0, spoke:true}); }
+      G.bolts.push({links, t:0, dur:.6, gen:-1, burst:{x:o.x, y:o.y, R}}); G.zapFlash = .5; sfx('zapboom'); doShake(5); landHitCrabs(o.x, o.y, R + 6); o.done = true; }
+  }
+  LO = LO.filter(o => !o.done);
+}
+
+/* ----- drawing ----- */
+function drawHero(){
+  const h = HERO, f = h.face, X = Math.round(h.x), Y = Math.round(h.y);
+  const p = (dx, dy, w, hh, c) => { const x = f > 0 ? X + dx : X - dx - w; px(x, Y + dy, w, hh, c); };
+  const step = h.ground && Math.abs(h.vx) > 8 ? Math.floor(h.walkT/5) % 4 : -1;
+  // legs and boots
+  const lA = step===0 ? 1 : step===2 ? -1 : 0, air = !h.ground;
+  p(-2 + (air ? -1 : lA), -5, 2, air ? 3 : 4, '#3a4660'); p(1 + (air ? 1 : -lA), -5, 2, air ? 3 : 4, '#323d56');
+  p(-2 + (air ? -1 : lA), air ? -2 : -1, 2, 1, '#2a2a30'); p(1 + (air ? 1 : -lA), air ? -2 : -1, 2, 1, '#2a2a30');
+  // coat
+  p(-3, -13, 6, 8, '#f2c14e'); p(2, -13, 1, 8, '#c99a2e'); p(-3, -9, 6, 1, '#c99a2e');
+  // arm: forward when holding a gun, swinging otherwise
+  if(curGun()) p(2, -11, 3, 2, '#f2c14e'); else p(-1 + (step===1 ? 1 : step===3 ? -1 : 0), -11, 2, 4, '#e0ae3e');
+  // head, beard, eye, hat
+  p(-2, -18, 5, 5, '#f0c39b'); p(-2, -15, 1, 2, '#8a5a3a'); p(-1, -14, 3, 1, '#8a5a3a'); p(1, -17, 1, 1, '#2a1a10');
+  p(-2, -20, 5, 2, '#2f5d50'); p(-3, -18, 7, 1, '#244a40');
+}
+function drawLandGun(fade){
+  const id = curGun(); if(!id || WS(id).lvl < 0 || !ISL) return;
+  const art = GUN_ART[id]; if(!art.sheet.complete || !art.sheet.naturalWidth) return;
+  const g = G.gun, h = heroHand(), C = art.cell, a = g.reload ? -30 : landAim(); g.aim += (a - g.aim)*.5;
+  const row = g.shotT*18 < art.frames ? Math.floor(g.shotT*18) : art.frames - 1;
+  let col = 0, best = 1e9; GUN_ANGLES.forEach((v, i) => { const d = Math.abs(v - g.aim); if(d < best){ best = d; col = i; } });
+  const extra = (g.aim - GUN_ANGLES[col])*Math.PI/180;
+  const sx = (h.x - Math.round(camX) + (G.shakeX||0))*GUN_K, sy = (h.y + (G.shakeY||0))*GUN_K;
+  const drawIt = () => { fxx.save(); fxx.translate(Math.round(sx), Math.round(sy)); fxx.scale(HERO.face, 1); if(Math.abs(extra) > .01) fxx.rotate(extra); fxx.drawImage(art.sheet, col*C, Math.min(row, art.frames-1)*C, C, C, -C/2, -C/2, C, C); fxx.restore(); };
+  fxx.globalAlpha = 1 - fade; drawIt(); fxx.globalAlpha = 1;
+  const lc = lightNow();
+  if(lc[0] < 253 || lc[1] < 253 || lc[2] < 253){ fxx.globalCompositeOperation = 'multiply'; fxx.fillStyle = `rgb(${lc})`; fxx.fillRect(sx - C, sy - C, C*2, C*2); fxx.globalCompositeOperation = 'destination-in'; fxx.globalAlpha = 1 - fade; drawIt(); fxx.globalCompositeOperation = 'source-over'; fxx.globalAlpha = 1; }
+}
+function renderLand(){
+  const I = ISL, cx = Math.round(camX), sx = shake>0 ? Math.round(rand(-shake,shake)*.5) : 0, sy = shake>0 ? Math.round(rand(-shake,shake)*.5) : 0;
+  G.shakeX = sx; G.shakeY = sy;
+  ctx.setTransform(1,0,0,1,0,0);
+  // sky (the shared side-view sky, lowered), clouds, the sea on the horizon and the far ridge
+  const [ka] = skyBlend(); ctx.fillStyle = SKY_PAL[ka].sky[0]; ctx.fillRect(0, 0, W, 42);
+  ctx.save(); ctx.translate(0, 40); drawSky(); for(const c of clouds) ctx.drawImage(c.img, Math.round(c.x), c.y); ctx.restore();
+  const sea = ctx.createLinearGradient(0, 100, 0, H); sea.addColorStop(0, shade(I.TH.sea, .25)); sea.addColorStop(1, shade(I.TH.sea, -.35)); ctx.fillStyle = sea; ctx.fillRect(0, 100, W, H-100);
+  for(let x=0; x<W; x+=1) if((x + Math.floor(time*6)) % 13 < 2) px(x, 102 + (x*7)%9, 2, 1, 'rgba(230,250,255,.35)');
+  ctx.drawImage(I.backC, Math.round(camX*.5), 0, W, H, 0, 0, W, H);
+  ctx.setTransform(1,0,0,1,sx - cx, sy);
+  ctx.drawImage(I.terrC, cx, 0, W, H, cx, 0, W, H);
+  // sea over the low ends of the beaches, with a little surf
+  for(let x=cx; x<cx+W; x++){ const g = I.hgt[clamp(x,0,I.NW-1)]; if(g <= WL) continue; const s = WL + Math.round(Math.sin(x*.08 + time*2)*1); px(x, s, 1, H - s, 'rgba(47,140,170,.78)'); if((x + Math.floor(time*10)) % 9 < 2) px(x, s, 1, 1, '#d8f4f6'); }
+  // your boat, pulled up at the near beach
+  if(cx < 60){ const hull = boat().hull, bx = 4, by = WL - 3; for(let r=0;r<6;r++){ const l = bx + r, rr = bx + 36 - r*2; px(l, by + r, rr - l, 1, r===0 ? shade(hull,.28) : r%3===1 ? shade(hull,-.35) : hull); } px(bx+2, by-10, 1, 10, '#4a3420'); px(bx, by-10, 3, 1, '#4a3420'); px(bx-1, by-9, 3, 3, '#7a5a2a'); }
+  for(const c of I.crabs) if(c.alive){ const y = Math.round(groundAt(c.x)) - 2, x = Math.round(c.x), legs = Math.floor(time*12) % 2; px(x-2, y, 5, 2, '#e8573a'); px(x-3, y-1, 1, 1, '#e8573a'); px(x+3, y-1, 1, 1, '#e8573a'); px(x-1, y-1, 1, 1, '#2a1a10'); px(x+1, y-1, 1, 1, '#2a1a10'); px(x-2 + legs, y+2, 1, 1, '#b8402a'); px(x+2 - legs, y+2, 1, 1, '#b8402a'); }
+  drawHero();
+  for(const b of LB){ ctx.fillStyle = 'rgba(255,244,210,.9)'; const n = b.kind==='sniper' ? 10 : b.kind==='shotgun' ? 3 : 6; for(let i=0;i<n;i++) ctx.fillRect(Math.round(b.x - b.dx*i*1.2), Math.round(b.y - b.dy*i*1.2), 1, 1); px(b.x, b.y, 1, 1, '#ffffff'); }
+  for(const p of LP){ if(p.t==='dust') px(p.x, p.y, 1, 1, `rgba(220,210,190,${p.life*2})`); else if(p.t==='debris') px(p.x, p.y, 1, 1, p.c); else if(p.t==='flash') { ctx.fillStyle = 'rgba(255,240,190,.9)'; ctx.fillRect(Math.round(p.x)-1, Math.round(p.y)-1, 3, 3); } }
+  ctx.drawImage(I.frontC, cx, 0, W, H, cx, 0, W, H);
+  for(const o of LO){ const r = o.phase==='arm' ? 3 : 2; px(o.x - r/2, o.y - r/2, r, r, o.phase==='arm' && Math.floor(o.t*14)%2 ? '#ffb04a' : '#dff4ff'); }
+  // time of day, then everything that glows
+  applyDayTint();
+  ctx.save(); ctx.setTransform(1,0,0,1,0,40); drawNightSky(); ctx.restore();
+  const n = nightK();
+  lanternGlow(HERO.x, HERO.y - 10, 34, n*.8);
+  if(I.glows.length){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; for(const g of I.glows){ if(g.x < cx - 40 || g.x > cx + W + 40) continue; const p = .75 + .25*Math.sin(time*2.4 + g.x); const gr = ctx.createRadialGradient(g.x, g.y, 1, g.x, g.y, g.r); gr.addColorStop(0, `rgba(255,120,50,${.45*p})`); gr.addColorStop(1, 'rgba(255,80,30,0)'); ctx.fillStyle = gr; ctx.fillRect(g.x - g.r, g.y - g.r, g.r*2, g.r*2); } ctx.restore(); }
+  if(n > .2 && (I.theme==='tropical' || I.theme==='mangrove')){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; for(const f of I.flies){ const x = f.x + Math.sin(time*.7 + f.ph)*10, y = f.y + Math.sin(time*1.1 + f.ph*2)*6, a = n*(.35 + .35*Math.sin(time*3 + f.ph)); if(a < .1 || x < cx-4 || x > cx+W+4) continue; ctx.fillStyle = `rgba(220,255,140,${a})`; ctx.fillRect(Math.round(x), Math.round(y), 1, 1); } ctx.restore(); }
+  for(const p of LP) if(p.t==='ember'){ ctx.fillStyle = `rgba(255,140,60,${Math.min(1, p.life/2)})`; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
+  drawLightning();
+  ctx.setTransform(1,0,0,1,0,0);
+  if(I.theme==='frozen') for(let i=0;i<46;i++){ const x = (i*67.3 + time*(8 + i%5*3)*.6 + Math.sin(time*.8+i)*6) % W, y = (i*37.1 + time*(14 + i%4*4)) % H; ctx.fillStyle = 'rgba(250,252,255,.85)'; ctx.fillRect(Math.round((x+W)%W), Math.round(y), 1, 1); }
+  // where you are on the island: a pip per stretch
+  const pn = I.panels, cur = clamp(Math.floor(HERO.x/W), 0, pn-1), x0 = Math.round(W/2 - pn*4);
+  for(let i=0;i<pn;i++) px(x0 + i*8, 5, 6, 2, i===cur ? '#ffd25e' : 'rgba(239,227,200,.35)');
+  if(G.flashA > 0){ ctx.fillStyle = `rgba(255,246,220,${G.flashA})`; ctx.fillRect(0,0,W,H); }
+  if(G.zapFlash > 0){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(90,150,255,${G.zapFlash*.35})`; ctx.fillRect(0,0,W,H); ctx.restore(); }
+  ctx.drawImage(vigC, 0, 0);
+}
+
 function update(dt){
   time += dt;
   shake = Math.max(0, shake - dt*18);
   if(G.trans) updateTrans(dt);
   updateClock(dt);
-  if(WORLD){ if(G.mode==='travel') updateTravel(dt); else updateFishing(dt); }
+  if(WORLD){ if(G.mode==='travel') updateTravel(dt); else if(G.mode==='land'){ if(ISL) updateLand(dt); } else updateFishing(dt); }
   miniT -= dt; if(G.mode==='travel' && miniT <= 0){ miniT = .15; renderMini(); }
   updateHud();
 }
@@ -3662,7 +4053,7 @@ function render(){
   // Transition: zoom into the boat and fade out, swap scenes, then fade back in
   let fade = 0, zoom = 1;
   if(tr){ const k = tr.t/tr.dur, a = k < .5 ? k/.5 : 1 - (k-.5)/.5; fade = ease(a); if(G.mode==='travel') zoom = 1 + fade*3; }
-  if(G.mode==='travel') renderTravel(zoom); else renderFishing();
+  if(G.mode==='travel') renderTravel(zoom); else if(G.mode==='land' && ISL) renderLand(); else renderFishing();
   if(fade > 0){ ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = `rgba(12,30,48,${fade})`; ctx.fillRect(0,0,W,H); }
   drawGunOverlay(fade);
 }

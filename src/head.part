@@ -138,7 +138,12 @@ body.portrait.touch #actions{bottom:calc(140px + env(safe-area-inset-bottom))}
 #strikeBtn kbd{font:11px Verdana,sans-serif;border:1px solid currentColor;padding:0 4px;border-radius:2px}
 .chip[hidden]{display:none}
 .invstat{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.invstat .chip{font-size:14px}
-body.touch[data-mode=travel]{touch-action:none}
+body.touch[data-mode=travel],body.touch[data-mode=land]{touch-action:none}
+body[data-mode="land"] #miniWrap, body[data-mode="land"] #gauge, body[data-mode="land"] #touchPad{display:none}
+#landPad{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));display:none;flex-direction:column;align-items:flex-end;gap:8px}
+body.touch[data-mode="land"] #landPad{display:flex}
+#landPad .pad.big{width:76px;height:76px;font-size:16px}
+#landPad .pad.down{background:rgba(40,70,100,.95)}
 #joy{position:fixed;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:2px solid rgba(239,227,200,.35);background:rgba(15,34,54,.25);z-index:40;pointer-events:none;opacity:0;transition:opacity .15s}
 #joy.on{opacity:1}#joy[hidden]{display:none}
 #joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;background:rgba(239,227,200,.45);border:2px solid rgba(239,227,200,.6);transform:translate(-50%,-50%)}
@@ -320,6 +325,7 @@ input[type=color]{width:48px;height:30px;border:2px solid var(--line);background
     <button class="tool" id="toolBtn" aria-haspopup="dialog"><img alt=""><kbd>Q</kbd><span class="badge" id="toolBadge" hidden>0</span></button>
   </div>
   <button class="btn" id="strikeBtn" hidden>Strike! <kbd>Space</kbd></button>
+  <div id="landPad" aria-label="Island controls"><button class="pad wide" id="padReload2">Reload</button><button class="pad big" id="padJump">Jump</button></div>
   <div id="touchPad" aria-label="Depth controls">
     <button class="pad wide" id="padReel">Reel in</button>
     <button class="pad wide" id="padReload" hidden>Reload</button>
